@@ -9,7 +9,6 @@ from gm_shield.core.config import settings
 engine = create_engine(
     settings.SQLITE_URL,
     connect_args={"check_same_thread": False},
-    poolclass=StaticPool, # In-memory db or single-user usage often benefit from this with SQLite
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
