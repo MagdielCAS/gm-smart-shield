@@ -78,7 +78,6 @@ describe("KnowledgePage", () => {
 			expect(screen.getByText("test.txt")).toBeInTheDocument();
 		});
 
-		// Verify the correct endpoint and payload were sent.
 		await waitFor(() => {
 			expect(mockFetch).toHaveBeenCalledWith(
 				"/api/v1/knowledge/",

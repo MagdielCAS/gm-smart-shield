@@ -34,7 +34,7 @@ def mock_chroma():
 
 @pytest.fixture
 def mock_httpx():
-    # Patch the class; the return value of calling it is the async context manager instance.
+    # We patch the class. The return value of calling the class is the instance.
     with patch("httpx.AsyncClient") as mock:
         yield mock
 
@@ -46,12 +46,18 @@ def test_health_heartbeat():
 
 
 def test_health_status_all_ok(override_get_db, mock_chroma, mock_httpx):
-    # Build an AsyncMock that acts as the httpx.AsyncClient context manager instance.
+    # Prepare the instance mock
+    # We want the instance to be an AsyncMock so its methods are async
     instance = AsyncMock()
     mock_httpx.return_value = instance
+
+    # When using 'async with', it calls __aenter__
+    # instance.__aenter__ should return the instance (or whatever 'as client' expects)
+    # Since instance is AsyncMock, __aenter__ is already async.
+    # We set its return value to the instance itself.
     instance.__aenter__.return_value = instance
 
-    # Mock the Ollama /api/tags response.
+    # Mock the response
     response_mock = MagicMock()
     response_mock.status_code = 200
     response_mock.json.return_value = {
@@ -61,11 +67,13 @@ def test_health_status_all_ok(override_get_db, mock_chroma, mock_httpx):
             {"name": "gemma3:12b-it-qat"},
         ]
     }
+
+    # Set the return value of get(). Since instance is AsyncMock, instance.get is AsyncMock.
     instance.get.return_value = response_mock
 
-    # Route is now mounted under /api/v1 prefix.
-    response = client.get("/api/v1/health/status")
+    response = client.get("/health/status")
 
+    # Debug info
     if response.status_code != 200 or not response.json().get("ollama"):
         print(f"DEBUG Response: {response.json()}")
 
@@ -88,13 +96,13 @@ def test_health_status_missing_model(override_get_db, mock_chroma, mock_httpx):
     response_mock.json.return_value = {
         "models": [
             {"name": "llama3.2:3b"},
-            # granite4 deliberately omitted to test the missing-model error path.
+            # granite4 missing
             {"name": "gemma3:12b-it-qat"},
         ]
     }
     instance.get.return_value = response_mock
 
-    response = client.get("/api/v1/health/status")
+    response = client.get("/health/status")
     assert response.status_code == 200
     data = response.json()
     assert data["ollama_models"]["granite4:latest"] is False
@@ -104,7 +112,7 @@ def test_health_status_missing_model(override_get_db, mock_chroma, mock_httpx):
 
 
 def test_health_status_db_fail(mock_chroma, mock_httpx):
-    # Override the DB dependency to simulate a connection failure.
+    # Override DB to fail
     def _get_db_fail():
         session = MagicMock()
         session.execute.side_effect = Exception("DB Connection Failed")
@@ -112,14 +120,14 @@ def test_health_status_db_fail(mock_chroma, mock_httpx):
 
     app.dependency_overrides[get_db] = _get_db_fail
 
-    # Ollama is healthy for this test — only the DB fails.
+    # Mock Ollama OK
     instance = AsyncMock()
     mock_httpx.return_value = instance
     instance.__aenter__.return_value = instance
     instance.get.return_value.status_code = 200
     instance.get.return_value.json.return_value = {"models": []}
 
-    response = client.get("/api/v1/health/status")
+    response = client.get("/health/status")
     app.dependency_overrides = {}
 
     assert response.status_code == 200

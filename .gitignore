@@ -212,3 +212,4 @@ data/
 # Electron
 apps/web/dist-electron/
 apps/web/dist-app/
+!apps/web/src/lib/
