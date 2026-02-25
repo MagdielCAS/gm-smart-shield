@@ -39,12 +39,8 @@ class HealthStatus(BaseModel):
     database: bool = Field(
         ..., description="``True`` if SQLite is reachable and queryable."
     )
-    chroma: bool = Field(
-        ..., description="``True`` if ChromaDB heartbeat succeeded."
-    )
-    ollama: bool = Field(
-        ..., description="``True`` if the Ollama server is reachable."
-    )
+    chroma: bool = Field(..., description="``True`` if ChromaDB heartbeat succeeded.")
+    ollama: bool = Field(..., description="``True`` if the Ollama server is reachable.")
     ollama_models: Dict[str, bool] = Field(
         ...,
         description=(
