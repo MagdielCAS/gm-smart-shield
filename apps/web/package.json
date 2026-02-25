@@ -65,8 +65,8 @@
 			"output": "dist-app"
 		},
 		"files": [
-			"dist/**/*",
-			"dist-electron/**/*",
+			"dist",
+			"dist-electron",
 			"package.json"
 		],
 		"mac": {
