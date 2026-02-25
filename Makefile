@@ -65,21 +65,6 @@ api-lint:
 	@echo "Running API linter..."
 	cd apps/api && uv run ruff check .
 
-docker-up:
-	@echo "Starting Docker services..."
-	docker compose up -d
-
-docker-down:
-	@echo "Stopping Docker services..."
-	docker compose down
-
-docker-logs:
-	@echo "Tailing Docker logs..."
-	docker compose logs -f
-
-docker-build:
-	@echo "Building Docker images..."
-	docker compose build
 web-lint:
 	@echo "Running Web linter..."
 	cd apps/web && pnpm lint

@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from gm_shield.main import app
-from gm_shield.features.health.routes import HealthStatus
 from gm_shield.shared.database.sqlite import get_db
 
 client = TestClient(app)
