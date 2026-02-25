@@ -15,13 +15,12 @@ export default defineConfig({
 		},
 	},
 	resolve: {
-		alias: [
-			{ find: "@", replacement: path.resolve(__dirname, "src") },
-		],
+		alias: [{ find: "@", replacement: path.resolve(__dirname, "src") }],
 	},
 	test: {
 		globals: true,
 		environment: "jsdom",
 		setupFiles: "./vitest.setup.ts",
+		exclude: ["node_modules", ".features-gen", "tests"],
 	},
 });
