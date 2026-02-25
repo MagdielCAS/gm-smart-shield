@@ -1,10 +1,14 @@
 pre-commit:
   parallel: true
   commands:
-    lint:
-      run: make lint
-    test:
-      run: make test
+    api-lint:
+      run: make api-lint
+    web-lint:
+      run: make web-lint
+    api-test:
+      run: make api-test
+    web-test:
+      run: make web-test
 
 pre-push:
   commands:

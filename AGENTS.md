@@ -2,7 +2,9 @@
 
 ## Repository context
 - **Project:** GM Smart Shield (local-first AI assistant for tabletop GMs).
-- **Current code focus:** Python API in `apps/api` (FastAPI + SQLite + ChromaDB).
+- **Current code focus:**
+  - Python API in `apps/api` (FastAPI + SQLite + ChromaDB).
+  - React Frontend in `apps/web` (Vite + TypeScript + Tailwind).
 - **Status:** pre-alpha; prioritize clear, incremental changes over broad refactors.
 
 ## Architecture overview (read before coding)
@@ -12,6 +14,11 @@
   - Core app config/bootstrap belongs in `apps/api/gm_shield/core/` and `main.py`.
 - Keep features loosely coupled; avoid importing feature internals across slices.
 - Preserve local-first assumptions (no mandatory cloud dependencies for core behavior).
+
+## Frontend context
+- See `apps/web/AGENTS.md` for frontend-specific guidelines.
+- Frontend resides in `apps/web` and is isolated from the backend build process.
+- Orchestration is handled via the root `Makefile`.
 
 ## Rules for adding features
 1. Start with a new or existing slice in `features/`; avoid dumping feature logic into `main.py`.
@@ -25,12 +32,13 @@
 - Use the existing test split:
   - `apps/api/tests/unit/` for fast isolated logic tests.
   - `apps/api/tests/features/` for behavior/API flow tests (pytest-bdd).
+  - `apps/web/src/**/*.test.tsx` for frontend unit tests (Vitest).
+  - `apps/web/tests/features` for frontend BDD tests (Playwright-BDD).
 - Default commands:
-  - `make test` (repo root)
-  - `cd apps/api && uv run python -m pytest`
-- For new endpoints, include at least:
-  - one success-path test,
-  - one failure/validation-path test.
+  - `make test` (repo root) - runs all tests.
+  - `make web-test` - runs frontend unit tests.
+  - `make web-test-bdd` - runs frontend BDD tests.
+- For new endpoints/features, include relevant tests.
 
 ## Practical conventions for agents
 - Keep edits minimal and localized.
