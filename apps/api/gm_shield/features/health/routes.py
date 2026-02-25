@@ -4,7 +4,6 @@ from typing import Dict, List
 import httpx
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-import chromadb
 
 from gm_shield.core.config import settings
 from gm_shield.shared.database.sqlite import get_db
