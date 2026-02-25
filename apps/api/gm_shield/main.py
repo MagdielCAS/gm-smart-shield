@@ -3,6 +3,7 @@ from fastapi import FastAPI
 
 from gm_shield.core.config import settings
 from gm_shield.shared.database.sqlite import engine, Base
+from gm_shield.shared.middleware import RateLimitMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,6 +24,8 @@ app = FastAPI(
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
 )
+
+app.add_middleware(RateLimitMiddleware)
 
 @app.get("/health")
 async def health_check():

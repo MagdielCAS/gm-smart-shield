@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # Worker
     WORKER_TYPE: str = "memory"  # 'memory' or 'redis' (future)
 
+    # Rate Limiting
+    RATELIMIT_DEFAULT: int = 100  # requests per minute
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Ensure data directories exist
