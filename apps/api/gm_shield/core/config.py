@@ -18,10 +18,10 @@ from pathlib import Path
 
 # Resolve directory paths relative to this file so the application works
 # regardless of the working directory from which uvicorn is launched.
-_CURRENT_FILE = Path(__file__).parent.resolve()   # → apps/api/gm_shield/core/
-_API_ROOT = _CURRENT_FILE.parent.parent            # → apps/api/
-_REPO_ROOT = _API_ROOT.parent.parent               # → gm-smart-shield/ (monorepo root)
-_DATA_DIR = _REPO_ROOT / "data"                    # → gm-smart-shield/data/
+_CURRENT_FILE = Path(__file__).parent.resolve()  # → apps/api/gm_shield/core/
+_API_ROOT = _CURRENT_FILE.parent.parent  # → apps/api/
+_REPO_ROOT = _API_ROOT.parent.parent  # → gm-smart-shield/ (monorepo root)
+_DATA_DIR = _REPO_ROOT / "data"  # → gm-smart-shield/data/
 
 
 class Settings(BaseSettings):

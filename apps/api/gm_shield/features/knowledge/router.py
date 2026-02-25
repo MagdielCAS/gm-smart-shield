@@ -8,7 +8,10 @@ via the task queue so that the HTTP response is returned immediately.
 
 from fastapi import APIRouter, status
 
-from gm_shield.features.knowledge.models import KnowledgeSourceCreate, KnowledgeSourceResponse
+from gm_shield.features.knowledge.models import (
+    KnowledgeSourceCreate,
+    KnowledgeSourceResponse,
+)
 from gm_shield.features.knowledge.service import process_knowledge_source
 from gm_shield.shared.worker.memory import get_task_queue
 
@@ -35,7 +38,9 @@ router = APIRouter()
         },
     },
 )
-async def add_knowledge_source(source: KnowledgeSourceCreate) -> KnowledgeSourceResponse:
+async def add_knowledge_source(
+    source: KnowledgeSourceCreate,
+) -> KnowledgeSourceResponse:
     """
     Enqueue a document for ingestion into the vector knowledge base.
 
