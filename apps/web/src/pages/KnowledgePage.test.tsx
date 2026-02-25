@@ -13,7 +13,7 @@ const mockOpenFile = vi.fn();
 
 // Mock fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+vi.stubGlobal("fetch", mockFetch);
 
 const queryClient = new QueryClient({
 	defaultOptions: {
