@@ -67,10 +67,10 @@ describe("KnowledgePage", () => {
 			expect(mockOpenFile).toHaveBeenCalled();
 		});
 
+		// Updated assertion: component now strips path and shows only filename
 		await waitFor(() => {
-			expect(
-				screen.getByText("Selected: /path/to/test.txt"),
-			).toBeInTheDocument();
+			expect(screen.getByText("Selected:")).toBeInTheDocument();
+			expect(screen.getByText("test.txt")).toBeInTheDocument();
 		});
 
 		await waitFor(() => {
@@ -83,8 +83,10 @@ describe("KnowledgePage", () => {
 			);
 		});
 
+		// Updated assertion: Success message might be split across elements
 		await waitFor(() => {
-			expect(screen.getByText(/Success! Task ID: 123/)).toBeInTheDocument();
+			expect(screen.getByText(/Successfully queued for processing/)).toBeInTheDocument();
+			expect(screen.getByText(/Task ID: 123/)).toBeInTheDocument();
 		});
 	});
 
@@ -107,9 +109,8 @@ describe("KnowledgePage", () => {
 
 		// We need to wait for the mutation to settle
 		await waitFor(() => {
-			expect(
-				screen.getByText("Error: Something went wrong"),
-			).toBeInTheDocument();
+			// The error message is rendered inside a p tag
+			expect(screen.getByText("Something went wrong")).toBeInTheDocument();
 		});
 	});
 });
