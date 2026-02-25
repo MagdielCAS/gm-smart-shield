@@ -3,6 +3,8 @@ from fastapi import FastAPI
 
 from gm_shield.core.config import settings
 from gm_shield.shared.database.sqlite import engine, Base
+from gm_shield.features.health import routes as health_routes
+from gm_shield.core.telemetry import setup_telemetry
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,6 +26,9 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_STR}/redoc",
 )
 
+# Setup telemetry (metrics) if enabled
+setup_telemetry(app)
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "version": "0.1.0"}
@@ -31,6 +36,8 @@ async def health_check():
 @app.get("/")
 async def root():
     return {"message": "Welcome to GM Smart Shield API"}
+
+app.include_router(health_routes.router, tags=["Health"])
 
 # Placeholder for feature routers
 # app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])

@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     # Worker
     WORKER_TYPE: str = "memory"  # 'memory' or 'redis' (future)
 
+    # Telemetry
+    ENABLE_METRICS: bool = False
+
+    # Ollama
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL_GENERAL: str = "llama3.2:3b"
+    OLLAMA_MODEL_STRUCTURED: str = "granite4:latest"
+    OLLAMA_MODEL_CREATIVE: str = "gemma3:12b-it-qat"
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Ensure data directories exist

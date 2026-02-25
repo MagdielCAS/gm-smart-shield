@@ -1,4 +1,4 @@
-.PHONY: setup run-api test lint
+.PHONY: setup run-api test lint docker-up docker-down docker-logs docker-build
 
 setup:
 	@echo "Setting up API dependencies..."
@@ -17,3 +17,19 @@ test:
 lint:
 	@echo "Running linter..."
 	cd apps/api && uv run ruff check .
+
+docker-up:
+	@echo "Starting Docker services..."
+	docker compose up -d
+
+docker-down:
+	@echo "Stopping Docker services..."
+	docker compose down
+
+docker-logs:
+	@echo "Tailing Docker logs..."
+	docker compose logs -f
+
+docker-build:
+	@echo "Building Docker images..."
+	docker compose build
