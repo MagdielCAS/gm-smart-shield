@@ -5,6 +5,7 @@ from datetime import datetime
 
 from gm_shield.shared.worker.base import TaskQueue
 
+
 class InMemoryTaskQueue(TaskQueue):
     """
     An in-memory task queue using asyncio.
@@ -17,7 +18,9 @@ class InMemoryTaskQueue(TaskQueue):
         # In a real app, you might want to run tasks in a background thread or process
         # Here we just use asyncio.create_task
 
-    async def enqueue(self, task: Callable[..., Coroutine[Any, Any, Any]], *args: Any, **kwargs: Any) -> str:
+    async def enqueue(
+        self, task: Callable[..., Coroutine[Any, Any, Any]], *args: Any, **kwargs: Any
+    ) -> str:
         task_id = str(uuid.uuid4())
         self.tasks[task_id] = {
             "status": "pending",
@@ -47,8 +50,10 @@ class InMemoryTaskQueue(TaskQueue):
     async def get_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         return self.tasks.get(task_id)
 
+
 # Singleton instance
 memory_queue = InMemoryTaskQueue()
+
 
 def get_task_queue() -> TaskQueue:
     return memory_queue

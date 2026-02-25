@@ -2,6 +2,7 @@ import pytest
 import asyncio
 from gm_shield.shared.worker.memory import InMemoryTaskQueue
 
+
 @pytest.mark.asyncio
 async def test_worker_enqueue():
     queue = InMemoryTaskQueue()
@@ -21,6 +22,7 @@ async def test_worker_enqueue():
 
     assert status["status"] == "completed"
     assert status["result"] == 7
+
 
 @pytest.mark.asyncio
 async def test_worker_get_status_non_existent():

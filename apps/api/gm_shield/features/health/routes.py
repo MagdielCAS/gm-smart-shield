@@ -11,6 +11,7 @@ from gm_shield.shared.database.chroma import get_chroma_client
 
 router = APIRouter()
 
+
 class HealthStatus(BaseModel):
     database: bool
     chroma: bool
@@ -18,17 +19,15 @@ class HealthStatus(BaseModel):
     ollama_models: Dict[str, bool]
     errors: List[str] = []
 
-@router.get("/health/status", response_model=HealthStatus, status_code=status.HTTP_200_OK)
+
+@router.get(
+    "/health/status", response_model=HealthStatus, status_code=status.HTTP_200_OK
+)
 async def check_health_status(db: Session = Depends(get_db)):
     """
     Detailed health check for database, ChromaDB, and Ollama services.
     """
-    health = HealthStatus(
-        database=False,
-        chroma=False,
-        ollama=False,
-        ollama_models={}
-    )
+    health = HealthStatus(database=False, chroma=False, ollama=False, ollama_models={})
 
     # 1. Check SQLite
     try:
@@ -50,7 +49,7 @@ async def check_health_status(db: Session = Depends(get_db)):
     required_models = [
         settings.OLLAMA_MODEL_GENERAL,
         settings.OLLAMA_MODEL_STRUCTURED,
-        settings.OLLAMA_MODEL_CREATIVE
+        settings.OLLAMA_MODEL_CREATIVE,
     ]
 
     # Initialize all models as not found
@@ -60,7 +59,9 @@ async def check_health_status(db: Session = Depends(get_db)):
     try:
         async with httpx.AsyncClient() as client:
             # Check connection by listing tags
-            response = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags", timeout=5.0)
+            response = await client.get(
+                f"{settings.OLLAMA_BASE_URL}/api/tags", timeout=5.0
+            )
 
             if response.status_code == 200:
                 health.ollama = True
@@ -77,7 +78,7 @@ async def check_health_status(db: Session = Depends(get_db)):
                     # but explicit is better.
                     # Or verify if `required` is a substring of available (e.g. library/tag)
                     elif any(avail.startswith(required) for avail in available_models):
-                         health.ollama_models[required] = True
+                        health.ollama_models[required] = True
                     else:
                         health.errors.append(f"Missing required model: {required}")
             else:

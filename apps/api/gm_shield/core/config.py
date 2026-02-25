@@ -15,8 +15,11 @@ API_ROOT = CURRENT_DIR.parent.parent
 REPO_ROOT = API_ROOT.parent.parent
 DATA_DIR = REPO_ROOT / "data"
 
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "GM Smart Shield"
@@ -40,7 +43,9 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Ensure data directories exist
-        os.makedirs(os.path.dirname(self.SQLITE_URL.replace("sqlite:///", "")), exist_ok=True)
+        os.makedirs(
+            os.path.dirname(self.SQLITE_URL.replace("sqlite:///", "")), exist_ok=True
+        )
         os.makedirs(self.CHROMA_PERSIST_DIRECTORY, exist_ok=True)
 
 
