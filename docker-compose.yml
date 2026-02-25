@@ -1,0 +1,50 @@
+services:
+  api:
+    build:
+      context: apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENABLE_METRICS=true
+      - OLLAMA_BASE_URL=http://ollama:11434
+      # Override paths for container environment
+      - SQLITE_URL=sqlite:////app/data/db/gm_shield.db
+      - CHROMA_PERSIST_DIRECTORY=/app/data/chroma
+    volumes:
+      # Map host data directories to container
+      - ./data/db:/app/data/db
+      - ./data/chroma:/app/data/chroma
+    depends_on:
+      - ollama
+      - prometheus
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Note: For GPU support, add 'deploy: resources: reservations: devices: - driver: nvidia ...'
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin  # Change in production
+
+volumes:
+  ollama_data:
+  prometheus_data:
+  grafana_data:
