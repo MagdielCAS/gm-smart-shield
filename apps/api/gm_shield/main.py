@@ -1,10 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 
 from gm_shield.core.config import settings
 from gm_shield.shared.database.sqlite import engine, Base
-from gm_shield.shared.worker.memory import memory_queue
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

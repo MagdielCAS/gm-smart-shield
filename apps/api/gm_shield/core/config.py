@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import DirectoryPath
 import os
 from pathlib import Path
 
