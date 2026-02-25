@@ -16,6 +16,10 @@ help:
 	@echo "  api-lint      - Run API linter"
 	@echo "  web-lint      - Run Web linter"
 	@echo "  web-build     - Build Web application"
+	@echo "  docker-up     - Start Docker services"
+	@echo "  docker-down   - Stop Docker services"
+	@echo "  docker-logs   - Tail Docker logs"
+	@echo "  docker-build  - Build Docker images"
 
 setup: api-setup web-setup
 
@@ -83,3 +87,19 @@ web-lint:
 web-build:
 	@echo "Building Web..."
 	cd apps/web && pnpm build
+
+docker-up:
+	@echo "Starting Docker services..."
+	docker compose up -d
+
+docker-down:
+	@echo "Stopping Docker services..."
+	docker compose down
+
+docker-logs:
+	@echo "Tailing Docker logs..."
+	docker compose logs -f
+
+docker-build:
+	@echo "Building Docker images..."
+	docker compose build
