@@ -83,12 +83,12 @@ graph TB
 |---|---|---|
 | Framework | **React + Vite** | Fast HMR, modern tooling |
 | Language | **TypeScript** | Type safety |
-| Styling | **Vanilla CSS / CSS Modules** | No framework dependency |
+| Styling | **Tailwind CSS + shadcn/ui** | Rapid, consistent UI development |
 | State Management | **Zustand** | Lightweight, minimal boilerplate |
 | Markdown Editor | **CodeMirror 6** | Powerful, extensible |
 | Markdown Preview | **remark / rehype** | GFM + frontmatter support |
 | HTTP Client | **TanStack Query + axios** | Caching, loading states |
-| ORM (local DB) | **Prisma** | SQLite ORM with type-safe client |
+| Testing | **Vitest + Playwright-BDD** | Unit & E2E/BDD testing |
 
 ### 3.2 Backend
 
@@ -579,9 +579,8 @@ uvicorn gm_shield.main:app --reload --port 8000
 
 ```bash
 cd apps/web
-npm install
-npx prisma migrate dev
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 The web app will be available at `http://localhost:5173` and the API at `http://localhost:8000`.
@@ -595,7 +594,6 @@ The web app will be available at `http://localhost:5173` and the API at `http://
 | LLM Runtime | Ollama | Easiest local model management, REST API |
 | Vector DB | ChromaDB | Embedded, no separate server, Python-native |
 | Structured DB | SQLite | Zero-config, file-based, perfect for local apps |
-| Frontend ORM | Prisma | Type-safe SQLite client for the web layer |
 | Agent Framework | LangChain / LlamaIndex | Mature RAG pipelines, local model support |
 | Background Tasks | ARQ | Async Redis-based queue (or in-process queue for MVP) |
 | Document Parsing | PyMuPDF | Best performance for PDF text extraction |
