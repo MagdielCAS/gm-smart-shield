@@ -21,3 +21,10 @@ async def test_worker_enqueue():
 
     assert status["status"] == "completed"
     assert status["result"] == 7
+
+@pytest.mark.asyncio
+async def test_worker_get_status_non_existent():
+    queue = InMemoryTaskQueue()
+    # Call get_status with a random UUID
+    status = await queue.get_status("non-existent-id")
+    assert status is None
