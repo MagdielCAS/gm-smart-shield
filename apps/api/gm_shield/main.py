@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from gm_shield.core.config import settings
 from gm_shield.shared.database.sqlite import engine, Base
 from gm_shield.features.health import routes as health_routes
+from gm_shield.features.knowledge import router as knowledge_router_module
 from gm_shield.core.telemetry import setup_telemetry
 
 
@@ -43,6 +44,6 @@ async def root():
 
 
 app.include_router(health_routes.router, tags=["Health"])
-
-# Placeholder for feature routers
-# app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
+app.include_router(
+    knowledge_router_module.router, prefix="/api/v1/knowledge", tags=["Knowledge"]
+)

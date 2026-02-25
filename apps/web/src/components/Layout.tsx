@@ -11,6 +11,14 @@ export function Layout() {
 								GM Smart Shield
 							</span>
 						</Link>
+						<nav className="flex items-center space-x-6 text-sm font-medium">
+							<Link
+								to="/knowledge"
+								className="transition-colors hover:text-foreground/80 text-foreground/60"
+							>
+								Knowledge
+							</Link>
+						</nav>
 					</div>
 				</div>
 			</header>
