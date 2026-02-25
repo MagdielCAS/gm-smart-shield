@@ -1,0 +1,47 @@
+name: Release Electron App
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ./apps/web
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+        run_install: false
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: 'pnpm'
+        cache-dependency-path: apps/web/pnpm-lock.yaml
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build Web
+      run: pnpm build
+
+    - name: Build Electron Main
+      run: pnpm electron:build
+
+    - name: Build and Release Electron App
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # This will build and upload artifacts to the GitHub release
+      run: pnpm electron-builder --publish always

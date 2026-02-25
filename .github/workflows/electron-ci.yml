@@ -1,0 +1,43 @@
+name: Electron CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  electron-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/web
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+        run_install: false
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: 'pnpm'
+        cache-dependency-path: apps/web/pnpm-lock.yaml
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build Web
+      run: pnpm build
+
+    - name: Build Electron Main
+      run: pnpm electron:build
+
+    - name: Verify Electron Pack (Dry Run)
+      # Build for Linux (dir target) to verify config
+      run: pnpm electron-builder --dir --linux
