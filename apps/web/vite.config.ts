@@ -21,6 +21,8 @@ export default defineConfig({
 		globals: true,
 		environment: "jsdom",
 		setupFiles: "./vitest.setup.ts",
-		exclude: ["node_modules", ".features-gen", "tests"],
+		// Exclude playwright-bdd generated specs — they use test.describe() from
+		// @playwright/test which is incompatible with vitest. Run them with `pnpm test:bdd`.
+		exclude: [".features-gen/**", "node_modules/**", "tests/**"],
 	},
 });
