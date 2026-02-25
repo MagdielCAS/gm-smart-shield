@@ -1,13 +1,16 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Coroutine, Dict, Optional
 
+
 class TaskQueue(ABC):
     """
     Abstract base class for a task queue.
     """
 
     @abstractmethod
-    async def enqueue(self, task: Callable[..., Coroutine[Any, Any, Any]], *args: Any, **kwargs: Any) -> str:
+    async def enqueue(
+        self, task: Callable[..., Coroutine[Any, Any, Any]], *args: Any, **kwargs: Any
+    ) -> str:
         """
         Enqueue a task.
         :param task: The async function to execute.

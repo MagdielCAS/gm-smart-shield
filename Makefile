@@ -1,4 +1,4 @@
-.PHONY: help setup api-setup web-setup run-api web-dev test api-test web-test web-test-e2e web-test-bdd lint api-lint web-lint web-build docker-up docker-down docker-logs docker-build
+.PHONY: help setup api-setup web-setup run-api web-dev test api-test web-test web-test-e2e web-test-bdd lint api-lint web-lint lint-fix api-lint-fix web-lint-fix format api-format web-format web-build docker-up docker-down docker-logs docker-build
 
 help: ## Show this help message
 	@echo "Available commands:"
@@ -44,9 +44,21 @@ web-test-bdd: ## Run Web BDD tests
 
 lint: api-lint web-lint ## Run all linters (API and Web)
 
+lint-fix: api-lint-fix web-lint-fix ## Auto-fix lint errors in all apps
+
 api-lint: ## Run API linter (ruff)
 	@echo "Running API linter..."
 	cd apps/api && uv run ruff check .
+
+api-lint-fix: ## Auto-fix API lint errors (ruff --fix)
+	@echo "Fixing API lint errors..."
+	cd apps/api && uv run ruff check --fix .
+
+format: api-format web-format ## Run formatters for all apps
+
+api-format: ## Format API code (ruff format)
+	@echo "Formatting API code..."
+	cd apps/api && uv run ruff format .
 
 docker-up: ## Start Docker services
 	@echo "Starting Docker services..."
@@ -66,6 +78,14 @@ docker-build: ## Build Docker images
 web-lint: ## Run Web linter (Biome)
 	@echo "Running Web linter..."
 	cd apps/web && pnpm lint
+
+web-lint-fix: ## Auto-fix Web lint errors (Biome --write)
+	@echo "Fixing Web lint errors..."
+	cd apps/web && pnpm biome check --write .
+
+web-format: ## Format Web code (Biome --write)
+	@echo "Formatting Web code..."
+	cd apps/web && pnpm biome format --write .
 
 web-build: ## Build Web application
 	@echo "Building Web..."

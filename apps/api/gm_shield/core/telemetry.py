@@ -8,6 +8,7 @@ from prometheus_client import make_asgi_app
 
 from gm_shield.core.config import settings
 
+
 def setup_telemetry(app: FastAPI):
     """
     Configures OpenTelemetry metrics and instrumentation.
@@ -16,9 +17,7 @@ def setup_telemetry(app: FastAPI):
     if not settings.ENABLE_METRICS:
         return
 
-    resource = Resource(attributes={
-        SERVICE_NAME: "gm-smart-shield-api"
-    })
+    resource = Resource(attributes={SERVICE_NAME: "gm-smart-shield-api"})
 
     # Create Prometheus reader
     # This registers with the default prometheus_client registry

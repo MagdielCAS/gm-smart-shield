@@ -6,19 +6,23 @@ from gm_shield.shared.database.sqlite import get_db
 
 client = TestClient(app)
 
+
 @pytest.fixture
 def mock_db_session():
     session = MagicMock()
     session.execute.return_value = None
     return session
 
+
 @pytest.fixture
 def override_get_db(mock_db_session):
     def _get_db():
         yield mock_db_session
+
     app.dependency_overrides[get_db] = _get_db
     yield
     app.dependency_overrides = {}
+
 
 @pytest.fixture
 def mock_chroma():
@@ -27,16 +31,19 @@ def mock_chroma():
         mock.return_value = client_mock
         yield client_mock
 
+
 @pytest.fixture
 def mock_httpx():
     # We patch the class. The return value of calling the class is the instance.
     with patch("httpx.AsyncClient") as mock:
         yield mock
 
+
 def test_health_heartbeat():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "version": "0.1.0"}
+
 
 def test_health_status_all_ok(override_get_db, mock_chroma, mock_httpx):
     # Prepare the instance mock
@@ -57,7 +64,7 @@ def test_health_status_all_ok(override_get_db, mock_chroma, mock_httpx):
         "models": [
             {"name": "llama3.2:3b"},
             {"name": "granite4:latest"},
-            {"name": "gemma3:12b-it-qat"}
+            {"name": "gemma3:12b-it-qat"},
         ]
     }
 
@@ -78,6 +85,7 @@ def test_health_status_all_ok(override_get_db, mock_chroma, mock_httpx):
     assert data["ollama_models"]["llama3.2:3b"] is True
     assert not data["errors"]
 
+
 def test_health_status_missing_model(override_get_db, mock_chroma, mock_httpx):
     instance = AsyncMock()
     mock_httpx.return_value = instance
@@ -89,7 +97,7 @@ def test_health_status_missing_model(override_get_db, mock_chroma, mock_httpx):
         "models": [
             {"name": "llama3.2:3b"},
             # granite4 missing
-            {"name": "gemma3:12b-it-qat"}
+            {"name": "gemma3:12b-it-qat"},
         ]
     }
     instance.get.return_value = response_mock
@@ -98,7 +106,10 @@ def test_health_status_missing_model(override_get_db, mock_chroma, mock_httpx):
     assert response.status_code == 200
     data = response.json()
     assert data["ollama_models"]["granite4:latest"] is False
-    assert any("Missing required model: granite4:latest" in err for err in data["errors"])
+    assert any(
+        "Missing required model: granite4:latest" in err for err in data["errors"]
+    )
+
 
 def test_health_status_db_fail(mock_chroma, mock_httpx):
     # Override DB to fail
