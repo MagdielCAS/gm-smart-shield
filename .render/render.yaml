@@ -1,0 +1,2 @@
+buildCommand: 'cd apps/web && pnpm install && pnpm build'
+publishDir: 'apps/web/dist'
