@@ -13,6 +13,7 @@ class InMemoryTaskQueue(TaskQueue):
 
     def __init__(self):
         self.tasks: Dict[str, Dict[str, Any]] = {}
+        self._background_tasks: set[asyncio.Task] = set()
         # In a real app, you might want to run tasks in a background thread or process
         # Here we just use asyncio.create_task
 
@@ -38,7 +39,9 @@ class InMemoryTaskQueue(TaskQueue):
                 self.tasks[task_id]["completed_at"] = datetime.now()
 
         # Fire and forget
-        asyncio.create_task(worker())
+        t = asyncio.create_task(worker())
+        self._background_tasks.add(t)
+        t.add_done_callback(self._background_tasks.discard)
         return task_id
 
     async def get_status(self, task_id: str) -> Optional[Dict[str, Any]]:
