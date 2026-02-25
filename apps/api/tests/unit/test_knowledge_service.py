@@ -21,7 +21,7 @@ def test_add_knowledge_source(mock_queue):
         json={"file_path": "/path/to/test.pdf", "description": "Test PDF"}
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     data = response.json()
     assert data["task_id"] == "mock_task_id"
     assert data["status"] == "pending"

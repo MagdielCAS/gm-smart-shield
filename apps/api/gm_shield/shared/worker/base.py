@@ -1,30 +1,54 @@
+"""
+Abstract base class for background task queues — shared infrastructure.
+
+Defines the common interface that all task queue backends must implement.
+Current implementations:
+- ``InMemoryTaskQueue`` (``shared.worker.memory``) — asyncio-based, suitable for development
+- Redis / ARQ backend (planned for production)
+"""
+
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Coroutine, Dict, Optional
 
 
 class TaskQueue(ABC):
     """
-    Abstract base class for a task queue.
+    Abstract interface for a background task queue.
+
+    All task queue backends (in-memory, Redis, etc.) must implement this interface
+    so that feature slices can depend on the abstraction rather than a concrete backend.
+    Swap implementations by changing the factory in ``shared.worker.memory``.
     """
 
     @abstractmethod
     async def enqueue(
-        self, task: Callable[..., Coroutine[Any, Any, Any]], *args: Any, **kwargs: Any
+        self,
+        task: Callable[..., Coroutine[Any, Any, Any]],
+        *args: Any,
+        **kwargs: Any,
     ) -> str:
         """
-        Enqueue a task.
-        :param task: The async function to execute.
-        :param args: Positional arguments for the task.
-        :param kwargs: Keyword arguments for the task.
-        :return: A task ID.
+        Submit an async task for background execution.
+
+        Args:
+            task: An async callable (coroutine function) to execute.
+            *args: Positional arguments forwarded to ``task``.
+            **kwargs: Keyword arguments forwarded to ``task``.
+
+        Returns:
+            str: A unique task ID that can be used to query execution status.
         """
-        pass
 
     @abstractmethod
     async def get_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get the status of a task.
-        :param task_id: The ID of the task.
-        :return: A dictionary with task status and result, or None if not found.
+        Retrieve the current status and result of an enqueued task.
+
+        Args:
+            task_id: The ID returned by a previous ``enqueue`` call.
+
+        Returns:
+            A dict containing at least ``{"status": str}`` plus optional fields
+            ``result``, ``error``, ``enqueued_at``, ``started_at``, ``completed_at``.
+            Returns ``None`` if the task ID is not recognised.
         """
-        pass
