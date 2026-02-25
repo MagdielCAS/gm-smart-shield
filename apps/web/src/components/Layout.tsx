@@ -1,6 +1,6 @@
 import { BookOpen, Home, Settings, Shield } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 import { SFIcon } from "./ui/SFIcon";
 
 export function Layout() {

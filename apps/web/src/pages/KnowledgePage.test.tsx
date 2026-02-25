@@ -45,13 +45,18 @@ describe("KnowledgePage", () => {
 
 	it("handles file selection and success API call", async () => {
 		mockOpenFile.mockResolvedValue("/path/to/test.txt");
-		mockFetch.mockResolvedValue({
-			ok: true,
-			json: async () => ({
-				task_id: "123",
-				status: "pending",
-				message: "Processing started",
-			}),
+
+		// Add delay to ensure "Selected" state is visible before success
+		mockFetch.mockImplementation(async () => {
+			await new Promise(resolve => setTimeout(resolve, 100));
+			return {
+				ok: true,
+				json: async () => ({
+					task_id: "123",
+					status: "pending",
+					message: "Processing started",
+				}),
+			};
 		});
 
 		render(
@@ -67,7 +72,7 @@ describe("KnowledgePage", () => {
 			expect(mockOpenFile).toHaveBeenCalled();
 		});
 
-		// Updated assertion: component now strips path and shows only filename
+		// Check for selected file text
 		await waitFor(() => {
 			expect(screen.getByText("Selected:")).toBeInTheDocument();
 			expect(screen.getByText("test.txt")).toBeInTheDocument();
@@ -83,9 +88,11 @@ describe("KnowledgePage", () => {
 			);
 		});
 
-		// Updated assertion: Success message might be split across elements
+		// Check for success message
 		await waitFor(() => {
-			expect(screen.getByText(/Successfully queued for processing/)).toBeInTheDocument();
+			expect(
+				screen.getByText(/Successfully queued for processing/),
+			).toBeInTheDocument();
 			expect(screen.getByText(/Task ID: 123/)).toBeInTheDocument();
 		});
 	});
@@ -109,7 +116,7 @@ describe("KnowledgePage", () => {
 
 		// We need to wait for the mutation to settle
 		await waitFor(() => {
-			// The error message is rendered inside a p tag
+			// The error message is rendered inside a p tag without "Error:" prefix in the new UI
 			expect(screen.getByText("Something went wrong")).toBeInTheDocument();
 		});
 	});
