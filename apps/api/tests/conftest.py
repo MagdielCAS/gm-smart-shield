@@ -3,10 +3,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-import os
 
 from gm_shield.main import app
-from gm_shield.core.config import settings
 from gm_shield.shared.database.sqlite import Base, get_db
 
 # Use in-memory SQLite for tests
