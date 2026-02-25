@@ -48,7 +48,7 @@ describe("KnowledgePage", () => {
 
 		// Add delay to ensure "Selected" state is visible before success
 		mockFetch.mockImplementation(async () => {
-			await new Promise(resolve => setTimeout(resolve, 100));
+			await new Promise((resolve) => setTimeout(resolve, 100));
 			return {
 				ok: true,
 				json: async () => ({
