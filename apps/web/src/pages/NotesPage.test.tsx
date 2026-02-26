@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import NotesPage from "./NotesPage";
 
 const mockFetch = vi.fn<typeof fetch>();
-global.fetch = mockFetch;
+vi.stubGlobal("fetch", mockFetch);
 
 const makeClient = () =>
 	new QueryClient({ defaultOptions: { queries: { retry: false } } });
