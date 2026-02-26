@@ -91,8 +91,6 @@ def delete_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> Respons
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-
-
 @router.post(
     "/inline-suggest",
     response_model=NoteInlineSuggestionResponse,
