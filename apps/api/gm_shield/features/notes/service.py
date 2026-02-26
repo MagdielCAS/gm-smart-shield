@@ -1,5 +1,5 @@
 """
-Business logic for the Notes feature slice.
+ Business logic for the Notes feature slice.
 
 Provides CRUD operations for note records, source links, and link-suggestion
 flows while keeping route handlers thin and focused on HTTP concerns.
@@ -611,3 +611,4 @@ def delete_note(db: Session, note_id: int) -> None:
 
     db.delete(note)
     db.commit()
+

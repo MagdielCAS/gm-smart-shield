@@ -1,5 +1,6 @@
 import {
 	BookOpen,
+	FileText,
 	Home,
 	MessageSquare,
 	Monitor,
