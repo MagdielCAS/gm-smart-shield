@@ -44,17 +44,13 @@ class BaseAgent:
         Returns:
             The generated text response.
         """
-        logger.info(
-            "agent_generate_start", agent=self.__class__.__name__, model=self.model
-        )
+        logger.info("agent_generate_start", agent=self.__class__.__name__, model=self.model)
         try:
             return await self.client.generate(
                 prompt=prompt, model=self.model, system=self.system_prompt, **kwargs
             )
         except Exception as e:
-            logger.error(
-                "agent_generate_failed", agent=self.__class__.__name__, error=str(e)
-            )
+            logger.error("agent_generate_failed", agent=self.__class__.__name__, error=str(e))
             raise
 
     async def stream(self, prompt: str, **kwargs) -> AsyncGenerator[str, None]:
@@ -68,16 +64,12 @@ class BaseAgent:
         Yields:
             Text chunks as they are generated.
         """
-        logger.info(
-            "agent_stream_start", agent=self.__class__.__name__, model=self.model
-        )
+        logger.info("agent_stream_start", agent=self.__class__.__name__, model=self.model)
         try:
             async for chunk in self.client.stream(
                 prompt=prompt, model=self.model, system=self.system_prompt, **kwargs
             ):
                 yield chunk
         except Exception as e:
-            logger.error(
-                "agent_stream_failed", agent=self.__class__.__name__, error=str(e)
-            )
+            logger.error("agent_stream_failed", agent=self.__class__.__name__, error=str(e))
             raise

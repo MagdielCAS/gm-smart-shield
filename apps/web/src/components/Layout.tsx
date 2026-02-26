@@ -1,13 +1,14 @@
 import {
 	BookOpen,
+	FileText,
 	Home,
 	MessageSquare,
 	Monitor,
 	Moon,
-	NotebookPen,
 	// Settings,
 	Shield,
 	Sun,
+	Swords,
 } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { type Theme, useTheme } from "../lib/useTheme";
@@ -27,8 +28,9 @@ export function Layout() {
 	const navItems = [
 		{ href: "/", label: "Dashboard", icon: Home },
 		{ href: "/knowledge", label: "Knowledge", icon: BookOpen },
+		{ href: "/notes", label: "Notes", icon: FileText },
+		{ href: "/encounters", label: "Encounters", icon: Swords },
 		{ href: "/chat", label: "AI Chat", icon: MessageSquare },
-		{ href: "/notes", label: "Notes", icon: NotebookPen },
 		// Deactivated for now
 		// { href: "/settings", label: "Settings", icon: Settings },
 	];

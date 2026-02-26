@@ -6,9 +6,7 @@ from pytest_bdd import given, parsers, scenario, then, when
 from gm_shield.shared.llm import config as llm_config
 
 
-@scenario(
-    "../llm_health.feature", "System check returns ready when all models are available"
-)
+@scenario("../llm_health.feature", "System check returns ready when all models are available")
 def test_system_check_ready():
     pass
 

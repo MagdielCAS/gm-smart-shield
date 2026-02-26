@@ -15,6 +15,7 @@ from gm_shield.features.chat import routes as chat_routes
 from gm_shield.features.health import routes as health_routes
 from gm_shield.features.knowledge import router as knowledge_router_module
 from gm_shield.features.notes import routes as notes_routes
+from gm_shield.features.encounters import routes as encounter_routes
 from gm_shield.core.telemetry import setup_telemetry
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -59,7 +60,11 @@ _TAGS_METADATA = [
     },
     {
         "name": "Notes",
-        "description": "Create, update, and organise markdown notes with tags and metadata.",
+        "description": "Manage GM notes with auto-tagging capabilities.",
+    },
+    {
+        "name": "Encounters",
+        "description": "Generate tactical encounters and NPC stat blocks.",
     },
 ]
 
@@ -159,4 +164,10 @@ app.include_router(
     notes_routes.router,
     prefix=f"{settings.API_V1_STR}/notes",
     tags=["Notes"],
+)
+
+app.include_router(
+    encounter_routes.router,
+    prefix=f"{settings.API_V1_STR}/encounters",
+    tags=["Encounters"],
 )
