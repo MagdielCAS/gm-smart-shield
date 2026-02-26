@@ -239,9 +239,10 @@ def _process_sync(source_id: int) -> str:
         client = get_chroma_client()
         collection = client.get_or_create_collection(name="knowledge_base")
 
-        # Delete old chunks for this file if re-processing
-        # ChromaDB supports deleting by where clause
-        collection.delete(where={"source": file_path})
+        # Collect existing vector IDs before write. We only delete them after the
+        # replacement write succeeds to avoid data loss on transient write errors.
+        existing_chunks = collection.get(where={"source": file_path}, include=[])
+        existing_ids = existing_chunks.get("ids", [])
 
         base_id = uuid.uuid4().hex[:8]
         ids = [f"{Path(file_path).name}_{base_id}_{i}" for i in range(len(chunks))]
@@ -255,6 +256,11 @@ def _process_sync(source_id: int) -> str:
             metadatas=metadatas,
             ids=ids,
         )
+
+        # Delete old chunks for this file only after the replacement set is
+        # successfully written.
+        if existing_ids:
+            collection.delete(ids=existing_ids)
 
         # 6. Complete
         source_record = (

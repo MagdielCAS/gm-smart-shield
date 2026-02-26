@@ -180,3 +180,26 @@ async def test_process_knowledge_source_exception_handling(
     assert "Failed: Corrupted file" in result
     assert source_record.status == "failed"
     assert "Corrupted file" in source_record.error_message
+
+
+@pytest.mark.asyncio
+async def test_process_knowledge_source_does_not_delete_on_add_failure(
+    mock_db_session, mock_external_services
+):
+    """Existing vectors are preserved if replacement write fails."""
+    source_record = MagicMock()
+    source_record.file_path = "/docs/rulebook.pdf"
+    mock_db_session.query.return_value.filter.return_value.first.return_value = (
+        source_record
+    )
+
+    collection = mock_external_services["collection"]
+    collection.get.return_value = {"ids": ["old_chunk_1", "old_chunk_2"]}
+    collection.add.side_effect = RuntimeError("Transient Chroma error")
+
+    result = await process_knowledge_source(1)
+
+    assert "Failed: Transient Chroma error" in result
+    collection.delete.assert_not_called()
+    assert source_record.status == "failed"
+    assert "Transient Chroma error" in source_record.error_message
