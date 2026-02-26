@@ -25,6 +25,7 @@ class KnowledgeSource(Base):
         created_at (datetime): Record creation timestamp.
         updated_at (datetime): Record last update timestamp.
     """
+
     __tablename__ = "knowledge_sources"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -46,11 +47,13 @@ class KnowledgeSource(Base):
     # Features (stored as JSON list of strings, e.g. ["indexation", "extraction"])
     features: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc)
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     @property

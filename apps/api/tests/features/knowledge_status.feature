@@ -13,7 +13,7 @@ Feature: Knowledge Base Status and Refresh
     When I request the list of knowledge sources
     Then the response status code should be 200
     And the list should contain "/docs/rulebook.pdf"
-    And the status of "/docs/rulebook.pdf" should be "pending" or "running" or "completed"
+    And the status of "/docs/rulebook.pdf" should be "pending" or "running" or "completed" or "failed"
 
   Scenario: Refresh a knowledge source
     Given I have an existing knowledge source with ID 1

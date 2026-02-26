@@ -29,11 +29,31 @@ const emptyListResponse = { items: [] };
 const populatedListResponse = {
 	items: [
 		{
+			id: 1,
 			source: "/docs/monster-manual.pdf",
 			filename: "monster-manual.pdf",
 			chunk_count: 42,
+			status: "completed",
+			progress: 100,
+			current_step: "Done",
+			started_at: "2023-01-01T00:00:00Z",
+			last_indexed_at: "2023-01-01T00:00:00Z",
+			error_message: null,
+			features: ["indexation"],
 		},
-		{ source: "/docs/rulebook.txt", filename: "rulebook.txt", chunk_count: 18 },
+		{
+			id: 2,
+			source: "/docs/rulebook.txt",
+			filename: "rulebook.txt",
+			chunk_count: 18,
+			status: "running",
+			progress: 50,
+			current_step: "Embedding",
+			started_at: "2023-01-01T00:00:00Z",
+			last_indexed_at: null,
+			error_message: null,
+			features: [],
+		},
 	],
 };
 const statsResponse = { document_count: 2, chunk_count: 60 };
@@ -120,7 +140,19 @@ describe("KnowledgePage", () => {
 		mockGetResponses(
 			{
 				items: [
-					{ source: "/docs/tiny.md", filename: "tiny.md", chunk_count: 1 },
+					{
+						id: 3,
+						source: "/docs/tiny.md",
+						filename: "tiny.md",
+						chunk_count: 1,
+						status: "completed",
+						progress: 100,
+						current_step: "Done",
+						started_at: null,
+						last_indexed_at: null,
+						error_message: null,
+						features: [],
+					},
 				],
 			},
 			{ document_count: 1, chunk_count: 1 },
