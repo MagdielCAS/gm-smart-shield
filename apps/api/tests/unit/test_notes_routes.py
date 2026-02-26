@@ -109,10 +109,14 @@ def test_note_link_suggestions_endpoint(client, monkeypatch):
     class MockCollection:
         def query(self, query_texts, n_results, include):
             return {
-                "ids": [["chunk-1", "chunk-2"]],
-                "documents": [["Waterdeep harbor smuggling ring", "Neverwinter politics"]],
-                "metadatas": [[{"source": "/data/lore.pdf", "page_number": 5}, {"source": "/data/lore.pdf", "page_number": 10}]],
-                "distances": [[0.1, 0.6]],
+                "ids": [["chunk-0", "chunk-1", "chunk-2"]],
+                "documents": [["Waterdeep smuggling ring exact lead", "Waterdeep harbor smuggling ring", "Neverwinter politics"]],
+                "metadatas": [[
+                    {"source": "/data/lore.pdf", "page_number": 1},
+                    {"source": "/data/lore.pdf", "page_number": 5},
+                    {"source": "/data/lore.pdf", "page_number": 10},
+                ]],
+                "distances": [[0.0, 0.1, 0.6]],
             }
 
         def get(self, include):
@@ -146,5 +150,6 @@ def test_note_link_suggestions_endpoint(client, monkeypatch):
     payload = suggest_response.json()
     assert payload["note_id"] == note_id
     assert len(payload["suggestions"]) == 2
-    assert payload["suggestions"][0]["chunk_id"] == "chunk-1"
-    assert payload["suggestions"][0]["page_number"] == 5
+    assert payload["suggestions"][0]["chunk_id"] == "chunk-0"
+    assert payload["suggestions"][0]["page_number"] == 1
+    assert payload["suggestions"][0]["similarity_score"] == 1.0
