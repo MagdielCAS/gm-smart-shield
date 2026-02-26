@@ -148,3 +148,54 @@ class NoteLinkSuggestionResponse(BaseModel):
 
     note_id: int = Field(..., description="Note identifier used to generate suggestions.")
     suggestions: list[NoteLinkSuggestion] = Field(default_factory=list, description="Suggested source links.")
+
+
+class NoteInlineSuggestionRequest(BaseModel):
+    """Payload requesting ghost-text suggestions while editing a note."""
+
+    content: str = Field(..., description="Current full editor content.")
+    cursor_index: int = Field(..., ge=0, description="Current cursor location within content.")
+
+
+class NoteInlineSuggestionResponse(BaseModel):
+    """Response payload for inline ghost-text suggestions."""
+
+    suggestion: str = Field(default="", description="Suggested text to insert at the cursor.")
+    reason: str = Field(
+        default="none",
+        description="Reason category for debugging: punctuation, newline, idle, or none.",
+    )
+
+
+class NoteTransformAction(str):
+    """Enum-like string literals for context menu transformation actions."""
+
+    REWRITE = "rewrite"
+    FORMAT = "format"
+    MAKE_DRAMATIC = "make_dramatic"
+    GENERATE_CONTENT = "generate_content"
+    ADD_REFERENCE_LINK = "add_reference_link"
+    SEARCH_REFERENCE_LINK = "search_reference_link"
+
+
+class NoteTransformRequest(BaseModel):
+    """Payload requesting non-destructive context transformations."""
+
+    action: str = Field(..., description="Requested transformation action.")
+    content: str = Field(..., description="Current full editor content.")
+    selection_start: int = Field(..., ge=0, description="Selection start index in the editor content.")
+    selection_end: int = Field(..., ge=0, description="Selection end index in the editor content.")
+
+
+class NoteTransformResponse(BaseModel):
+    """Preview payload for a context-action transformation."""
+
+    action: str = Field(..., description="Transformation action that produced this preview.")
+    original_text: str = Field(..., description="Original selected text before transformation.")
+    preview_text: str = Field(..., description="Suggested replacement or insertion text.")
+    selection_start: int = Field(..., ge=0, description="Selection start index used by the action.")
+    selection_end: int = Field(..., ge=0, description="Selection end index used by the action.")
+    mode: str = Field(
+        default="replace",
+        description="How to apply preview: replace or insert.",
+    )
