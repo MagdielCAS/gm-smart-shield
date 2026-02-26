@@ -176,6 +176,10 @@ const KnowledgePage = () => {
 		}
 	};
 
+	/**
+	 * Calculates estimated time remaining based on start time and current progress percentage.
+	 * Returns a human-readable string (e.g., "~ 2 min remaining") or null if indeterminate.
+	 */
 	const getEstimatedTimeRemaining = (
 		startedAt: string | null,
 		progress: number,
