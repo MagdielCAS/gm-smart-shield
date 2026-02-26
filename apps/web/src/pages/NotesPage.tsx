@@ -100,7 +100,14 @@ export default function NotesPage() {
 
 	const saveMutation = useMutation({
 		mutationFn: async () => {
-			const payload = { title: draftTitle.trim(), content: draftContent };
+			const payload = {
+				title: draftTitle.trim(),
+				content: draftContent,
+				folder_id: selectedNote?.folder_id ?? null,
+				frontmatter: selectedNote?.frontmatter ?? null,
+				tags: selectedNote?.tags ?? [],
+				sources: selectedNote?.links ?? [],
+			};
 			if (selectedNoteId) {
 				return updateNote(selectedNoteId, payload);
 			}
