@@ -90,6 +90,10 @@ class NoteResponse(BaseModel):
         default=None,
         description="Optional frontmatter metadata stored with the note.",
     )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Normalized extracted metadata derived from note content.",
+    )
     folder_id: int | None = Field(
         default=None,
         description="Optional folder identifier linked to the note.",
