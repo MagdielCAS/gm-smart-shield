@@ -91,6 +91,8 @@ describe("NotesPage", () => {
 			expect(screen.getByText("Session 1")).toBeInTheDocument();
 			expect(screen.getByText("/rules/phb.pdf")).toBeInTheDocument();
 			expect(screen.getByText("session")).toBeInTheDocument();
+			expect(screen.getByText(/^Created:/)).not.toHaveTextContent("Not saved");
+			expect(screen.getByText(/^Updated:/)).not.toHaveTextContent("Not saved");
 		});
 	});
 
@@ -262,5 +264,53 @@ describe("NotesPage", () => {
 		expect(
 			screen.getByDisplayValue(/rewritten for clarity/),
 		).toBeInTheDocument();
+	});
+
+	it("invokes add reference link context action", async () => {
+		mockFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ items: [] }),
+			} as Response)
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					action: "add_reference_link",
+					original_text: "Waterdeep",
+					preview_text: "[Waterdeep](ref://knowledge/waterdeep)",
+					selection_start: 4,
+					selection_end: 13,
+					mode: "replace",
+				}),
+			} as Response);
+
+		render(<NotesPage />, { wrapper });
+
+		const markdownInput = screen.getByLabelText("Markdown");
+		fireEvent.change(markdownInput, {
+			target: { value: "The Waterdeep docks", selectionStart: 13 },
+		});
+
+		(markdownInput as HTMLTextAreaElement).setSelectionRange(4, 13);
+		fireEvent.contextMenu(markdownInput, {
+			clientX: 120,
+			clientY: 120,
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Add reference link" }));
+
+		await waitFor(() => {
+			expect(mockFetch).toHaveBeenCalledWith(
+				"/api/v1/notes/transform/preview",
+				expect.objectContaining({
+					method: "POST",
+					body: JSON.stringify({
+						action: "add_reference_link",
+						content: "The Waterdeep docks",
+						selection_start: 4,
+						selection_end: 13,
+					}),
+				}),
+			);
+		});
 	});
 });
