@@ -7,8 +7,10 @@ runs asynchronously in the background via the task queue so that the HTTP
 response is returned immediately.
 """
 
-from fastapi import APIRouter, status
-from gm_shield.features.knowledge.models import (
+import asyncio
+from fastapi import APIRouter, status, HTTPException
+
+from gm_shield.features.knowledge.schemas import (
     KnowledgeListResponse,
     KnowledgeSourceCreate,
     KnowledgeSourceItem,
@@ -16,9 +18,11 @@ from gm_shield.features.knowledge.models import (
     KnowledgeStatsResponse,
 )
 from gm_shield.features.knowledge.service import (
+    create_or_update_knowledge_source,
     get_knowledge_list,
     get_knowledge_stats,
     process_knowledge_source,
+    refresh_knowledge_source,
 )
 from gm_shield.shared.worker.memory import get_task_queue
 
@@ -62,13 +66,46 @@ async def add_knowledge_source(source: KnowledgeSourceCreate):
     Returns a `task_id` that can be used to poll the processing status via
     `GET /api/v1/tasks/{task_id}` (when that endpoint is available).
     """
+    # Create DB record synchronously (wrapped in thread)
+    source_id = await asyncio.to_thread(
+        create_or_update_knowledge_source, source.file_path
+    )
+
     queue = get_task_queue()
-    task_id = await queue.enqueue(process_knowledge_source, source.file_path)
+    # Now passing the database ID instead of the file path
+    task_id = await queue.enqueue(process_knowledge_source, source_id)
 
     return KnowledgeSourceResponse(
         task_id=task_id,
         status="pending",
         message=f"Processing started for {source.file_path}",
+    )
+
+
+@router.post(
+    "/{source_id}/refresh",
+    response_model=KnowledgeSourceResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Refresh (re-process) a knowledge source",
+    description="Resets the status of a knowledge source and triggers re-ingestion.",
+)
+async def refresh_source(source_id: int):
+    """
+    Re-trigger processing for an existing knowledge source.
+    Useful if the file changed or processing was interrupted.
+    """
+    try:
+        await asyncio.to_thread(refresh_knowledge_source, source_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    queue = get_task_queue()
+    task_id = await queue.enqueue(process_knowledge_source, source_id)
+
+    return KnowledgeSourceResponse(
+        task_id=task_id,
+        status="pending",
+        message=f"Refresh started for source {source_id}",
     )
 
 

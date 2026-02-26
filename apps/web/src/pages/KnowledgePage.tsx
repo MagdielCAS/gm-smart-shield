@@ -5,13 +5,15 @@ import {
 	Database,
 	FileText,
 	Loader2,
+	RefreshCw,
 	UploadCloud,
 } from "lucide-react";
 import { useState } from "react";
-import { GlassButton } from "@/components/ui/GlassButton";
-import { GlassCard } from "@/components/ui/GlassCard";
-import { SFIcon } from "@/components/ui/SFIcon";
+import { GlassButton } from "../components/ui/GlassButton";
+import { GlassCard } from "../components/ui/GlassCard";
+import { SFIcon } from "../components/ui/SFIcon";
 import { API_BASE_URL } from "../config";
+import { cn } from "../lib/utils";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,9 +29,17 @@ interface KnowledgeSourceResponse {
 }
 
 interface KnowledgeSourceItem {
+	id: number;
 	source: string;
 	filename: string;
 	chunk_count: number;
+	status: string; // pending, running, completed, failed
+	progress: number;
+	current_step: string | null;
+	started_at: string | null;
+	last_indexed_at: string | null;
+	error_message: string | null;
+	features: string[];
 }
 
 interface KnowledgeListResponse {
@@ -64,6 +74,12 @@ const KnowledgePage = () => {
 	const listQuery = useQuery({
 		queryKey: ["knowledge", "list"],
 		queryFn: fetchKnowledgeList,
+		refetchInterval: (query) => {
+			const isProcessing = query.state.data?.items.some((i) =>
+				["pending", "running"].includes(i.status),
+			);
+			return isProcessing ? 1000 : false;
+		},
 	});
 
 	const statsQuery = useQuery({
@@ -98,6 +114,27 @@ const KnowledgePage = () => {
 		},
 	});
 
+	const refreshMutation = useMutation<KnowledgeSourceResponse, Error, number>({
+		mutationFn: async (sourceId) => {
+			const response = await fetch(
+				`${API_BASE_URL}/v1/knowledge/${sourceId}/refresh`,
+				{
+					method: "POST",
+				},
+			);
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.detail || "Failed to refresh source");
+			}
+
+			return response.json();
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["knowledge"] });
+		},
+	});
+
 	const handleSelectFile = async () => {
 		if (!window.electron) {
 			alert(
@@ -115,6 +152,53 @@ const KnowledgePage = () => {
 		} catch (error) {
 			console.error("Failed to open file:", error);
 		}
+	};
+
+	const formatDate = (dateString: string | null) => {
+		if (!dateString) return "Never";
+		return new Date(dateString).toLocaleString(undefined, {
+			dateStyle: "medium",
+			timeStyle: "short",
+		});
+	};
+
+	const getStatusColor = (status: string) => {
+		switch (status) {
+			case "completed":
+				return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20 border";
+			case "failed":
+				return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20 border";
+			case "running":
+			case "pending":
+				return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 border";
+			default:
+				return "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20 border";
+		}
+	};
+
+	const getEstimatedTimeRemaining = (
+		startedAt: string | null,
+		progress: number,
+	) => {
+		if (!startedAt || progress <= 0 || progress >= 100) return null;
+
+		const start = new Date(startedAt).getTime();
+		const now = Date.now();
+		const elapsed = now - start; // in ms
+
+		if (elapsed < 0) return null;
+		if (elapsed < 2000) return "Calculating..."; // Give it a moment to stabilize
+
+		const totalEstimated = (elapsed / progress) * 100;
+		const remaining = totalEstimated - elapsed;
+
+		if (remaining < 0) return "Almost done...";
+
+		const seconds = Math.floor(remaining / 1000);
+		if (seconds < 60) return "< 1 min remaining";
+
+		const minutes = Math.floor(seconds / 60);
+		return `~ ${minutes} min remaining`;
 	};
 
 	return (
@@ -289,26 +373,121 @@ const KnowledgePage = () => {
 						<div className="grid grid-cols-1 divide-y divide-white/10">
 							{listQuery.data.items.map((item) => (
 								<div
-									key={item.source}
-									className="group flex items-center justify-between p-4 hover:bg-white/40 dark:hover:bg-white/10 transition-colors cursor-default"
+									key={item.id}
+									className="group flex flex-col p-4 hover:bg-white/40 dark:hover:bg-white/10 transition-colors cursor-default"
 								>
-									<div className="flex items-center gap-4">
-										<div className="h-10 w-10 rounded-lg bg-white/60 dark:bg-white/10 flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
-											<SFIcon icon={FileText} className="h-5 w-5" />
+									<div className="flex items-start justify-between w-full">
+										<div className="flex items-start gap-4">
+											<div className="h-10 w-10 rounded-lg bg-white/60 dark:bg-white/10 flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors mt-1">
+												<SFIcon icon={FileText} className="h-5 w-5" />
+											</div>
+											<div>
+												<p className="font-medium break-all">{item.filename}</p>
+												<p className="text-xs text-muted-foreground mt-0.5">
+													{item.source}
+												</p>
+
+												{/* Features Pills */}
+												<div className="flex flex-wrap gap-2 mt-2">
+													{item.features.map((feature) => (
+														<span
+															key={feature}
+															className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary uppercase tracking-wider"
+														>
+															{feature}
+														</span>
+													))}
+												</div>
+											</div>
 										</div>
-										<div>
-											<p className="font-medium">{item.filename}</p>
-											<p className="text-xs text-muted-foreground">
-												{item.chunk_count} chunk
-												{item.chunk_count !== 1 ? "s" : ""}
+
+										<div className="flex flex-col items-end gap-2">
+											<div className="flex items-center gap-2">
+												{/* Refresh Button */}
+												<div
+													className="opacity-0 group-hover:opacity-100 transition-opacity"
+													title="Refresh source"
+												>
+													<GlassButton
+														size="icon"
+														variant="ghost"
+														className="h-8 w-8"
+														onClick={(e) => {
+															e.stopPropagation();
+															refreshMutation.mutate(item.id);
+														}}
+														disabled={
+															refreshMutation.isPending ||
+															["running", "pending"].includes(item.status)
+														}
+													>
+														<RefreshCw
+															className={cn(
+																"h-4 w-4",
+																refreshMutation.isPending &&
+																	refreshMutation.variables === item.id &&
+																	"animate-spin text-primary",
+															)}
+														/>
+													</GlassButton>
+												</div>
+
+												{/* Status Badge */}
+												<span
+													className={cn(
+														"inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border",
+														getStatusColor(item.status),
+													)}
+												>
+													{item.status === "running" && (
+														<Loader2 className="mr-1 h-3 w-3 animate-spin" />
+													)}
+													{item.status.charAt(0).toUpperCase() +
+														item.status.slice(1)}
+												</span>
+											</div>
+
+											<p className="text-[10px] text-muted-foreground text-right">
+												Updated: {formatDate(item.last_indexed_at)}
 											</p>
 										</div>
 									</div>
-									<div className="flex items-center gap-2">
-										<span className="inline-flex items-center rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
-											Indexed
-										</span>
-									</div>
+
+									{/* Progress Bar & Details */}
+									{["running", "pending"].includes(item.status) && (
+										<div className="mt-4 pl-14 pr-2">
+											<div className="flex justify-between text-xs text-muted-foreground mb-1">
+												<span className="truncate max-w-[200px]">
+													{item.current_step || "Initializing..."}
+												</span>
+												<div className="flex gap-2">
+													{item.status === "running" && (
+														<span className="font-medium text-primary">
+															{getEstimatedTimeRemaining(
+																item.started_at,
+																item.progress,
+															)}
+														</span>
+													)}
+													<span>{Math.round(item.progress)}%</span>
+												</div>
+											</div>
+											<div className="h-1.5 w-full rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
+												<div
+													className="h-full bg-primary transition-all duration-500 ease-out"
+													style={{ width: `${item.progress}%` }}
+												/>
+											</div>
+										</div>
+									)}
+
+									{/* Error Message */}
+									{item.status === "failed" && item.error_message && (
+										<div className="mt-3 ml-14 rounded-md bg-destructive/10 p-3 text-xs text-destructive">
+											<p className="font-semibold mb-0.5">Processing Failed</p>
+											<p>{item.error_message}</p>
+										</div>
+									)}
 								</div>
 							))}
 						</div>

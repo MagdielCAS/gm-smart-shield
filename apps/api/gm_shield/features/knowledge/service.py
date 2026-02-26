@@ -12,14 +12,19 @@ Supported file formats: PDF (.pdf), plain text (.txt), Markdown (.md), CSV (.csv
 
 import asyncio
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
+from sqlalchemy.orm import Session
+
 from gm_shield.shared.database.chroma import get_chroma_client
 from gm_shield.core.logging import get_logger
+from gm_shield.shared.database.sqlite import SessionLocal
+from gm_shield.features.knowledge.models import KnowledgeSource
 
 logger = get_logger(__name__)
 
@@ -105,131 +110,252 @@ def extract_text_from_file(file_path: str) -> str:
 # ── Core processing pipeline ─────────────────────────────────────────────────
 
 
-def _process_sync(file_path: str) -> str:
+def _update_task_state(
+    session: Session,
+    source_id: int,
+    status: str = None,
+    progress: float = None,
+    step: str = None,
+    error: str = None,
+    started_at: datetime = None,
+):
+    """Helper to update the KnowledgeSource record in a thread-safe way."""
+    try:
+        # Re-query inside the session to attach the object
+        source = (
+            session.query(KnowledgeSource)
+            .filter(KnowledgeSource.id == source_id)
+            .first()
+        )
+        if not source:
+            return
+
+        if status:
+            source.status = status
+        if progress is not None:
+            source.progress = progress
+        if step:
+            source.current_step = step
+        if error:
+            source.error_message = error
+        if started_at:
+            source.started_at = started_at
+
+        session.commit()
+    except Exception as e:
+        logger.error(f"Failed to update task state for source {source_id}: {e}")
+        session.rollback()
+
+
+def _process_sync(source_id: int) -> str:
     """
-    Run the full ingestion pipeline for a single file (blocking).
-
-    Intended to be called inside a thread-pool executor via
-    :func:`process_knowledge_source` so the event loop is not blocked.
-
-    Pipeline steps:
-        1. Extract raw text from the file.
-        2. Split the text into overlapping chunks using a recursive character splitter.
-        3. Embed the chunks with the local ``all-MiniLM-L6-v2`` sentence-transformer.
-        4. Upsert the embedded chunks into the ChromaDB ``knowledge_base`` collection.
+    Run the full ingestion pipeline for a single source (blocking).
+    Updates status in SQLite database throughout the process.
 
     Args:
-        file_path: Path to the file to ingest.
+        source_id: ID of the KnowledgeSource record to process.
 
     Returns:
-        A summary string, e.g. ``"Processed 42 chunks"``.
+        A summary string.
     """
-    logger.info("ingestion_started", file_path=file_path)
-
-    # Step 1 — Extract
-    text = extract_text_from_file(file_path)
-    if not text.strip():
-        logger.warning("no_text_extracted", file_path=file_path)
-        return "No text content found"
-
-    # Step 2 — Chunk
-    # RecursiveCharacterTextSplitter tries to keep paragraphs/sentences intact.
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len,
-    )
-    chunks = text_splitter.split_text(text)
-    logger.info("chunks_generated", file_path=file_path, chunk_count=len(chunks))
-
-    if not chunks:
-        return "No chunks generated"
-
-    # Step 3 — Embed
-    model = get_embedding_model()
-    embeddings = model.encode(chunks)
-
-    # Step 4 — Store in ChromaDB
-    # IDs are randomised per ingestion run to allow re-processing the same file
-    client = get_chroma_client()
-    collection = client.get_or_create_collection(name="knowledge_base")
-
-    base_id = uuid.uuid4().hex[:8]
-    ids = [f"{Path(file_path).name}_{base_id}_{i}" for i in range(len(chunks))]
-    metadatas = [{"source": file_path, "chunk_index": i} for i in range(len(chunks))]
-
-    collection.add(
-        documents=chunks,
-        embeddings=embeddings.tolist(),
-        metadatas=metadatas,
-        ids=ids,
+    session = SessionLocal()
+    source_record = (
+        session.query(KnowledgeSource).filter(KnowledgeSource.id == source_id).first()
     )
 
-    logger.info("ingestion_complete", file_path=file_path, chunk_count=len(chunks))
-    return f"Processed {len(chunks)} chunks"
+    if not source_record:
+        logger.error("knowledge_source_not_found", source_id=source_id)
+        return "Source not found"
+
+    file_path = source_record.file_path
+    logger.info("ingestion_started", file_path=file_path, source_id=source_id)
+
+    try:
+        # 1. Start
+        _update_task_state(
+            session,
+            source_id,
+            status="running",
+            progress=0.0,
+            step="Extracting text",
+            started_at=datetime.now(timezone.utc),
+        )
+
+        # 2. Extract
+        text = extract_text_from_file(file_path)
+        if not text.strip():
+            logger.warning("no_text_extracted", file_path=file_path)
+            _update_task_state(
+                session, source_id, status="failed", error="No text content found"
+            )
+            return "No text content found"
+
+        # 3. Chunk
+        _update_task_state(session, source_id, progress=20.0, step="Chunking text")
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
+        )
+        chunks = text_splitter.split_text(text)
+        logger.info("chunks_generated", file_path=file_path, chunk_count=len(chunks))
+
+        if not chunks:
+            _update_task_state(
+                session, source_id, status="failed", error="No chunks generated"
+            )
+            return "No chunks generated"
+
+        # 4. Embed (Batched)
+        _update_task_state(
+            session, source_id, progress=30.0, step="Generating embeddings"
+        )
+        model = get_embedding_model()
+
+        batch_size = 32
+        total_chunks = len(chunks)
+        embeddings = []
+
+        for i in range(0, total_chunks, batch_size):
+            batch = chunks[i : i + batch_size]
+            batch_embeddings = model.encode(batch)
+            embeddings.extend(batch_embeddings)
+
+            # Calculate progress between 30% and 90%
+            current_progress = 30.0 + (
+                60.0 * (min(i + batch_size, total_chunks) / total_chunks)
+            )
+            _update_task_state(
+                session,
+                source_id,
+                progress=current_progress,
+                step=f"Generating embeddings ({min(i + batch_size, total_chunks)}/{total_chunks})",
+            )
+
+        # 5. Store in ChromaDB
+        _update_task_state(
+            session, source_id, progress=90.0, step="Storing in Vector DB"
+        )
+        client = get_chroma_client()
+        collection = client.get_or_create_collection(name="knowledge_base")
+
+        # Delete old chunks for this file if re-processing
+        # ChromaDB supports deleting by where clause
+        collection.delete(where={"source": file_path})
+
+        base_id = uuid.uuid4().hex[:8]
+        ids = [f"{Path(file_path).name}_{base_id}_{i}" for i in range(len(chunks))]
+        metadatas = [
+            {"source": file_path, "chunk_index": i} for i in range(len(chunks))
+        ]
+
+        collection.add(
+            documents=chunks,
+            embeddings=[e.tolist() for e in embeddings],  # numpy array to list
+            metadatas=metadatas,
+            ids=ids,
+        )
+
+        # 6. Complete
+        source_record = (
+            session.query(KnowledgeSource)
+            .filter(KnowledgeSource.id == source_id)
+            .first()
+        )
+        if source_record:
+            source_record.status = "completed"
+            source_record.progress = 100.0
+            source_record.current_step = "Done"
+            source_record.last_indexed_at = datetime.now(timezone.utc)
+            source_record.chunk_count = len(chunks)
+            source_record.error_message = None
+            if not source_record.features:
+                source_record.features = ["indexation"]  # Default feature
+            session.commit()
+
+        logger.info("ingestion_complete", file_path=file_path, chunk_count=len(chunks))
+        return f"Processed {len(chunks)} chunks"
+
+    except Exception as e:
+        logger.error("ingestion_failed", source_id=source_id, error=str(e))
+        _update_task_state(session, source_id, status="failed", error=str(e))
+        return f"Failed: {e}"
+    finally:
+        session.close()
 
 
 # ── Async entry point ─────────────────────────────────────────────────────────
 
 
-async def process_knowledge_source(file_path: str) -> str:
+async def process_knowledge_source(source_id: int) -> str:
     """
     Async entry-point for the knowledge-source ingestion pipeline.
 
-    Delegates CPU-bound work to a thread-pool executor so the asyncio event
-    loop remains unblocked while text extraction, chunking, and embedding run.
-
     Args:
-        file_path: Path to the file to ingest (passed through to :func:`_process_sync`).
+        source_id: ID of the KnowledgeSource record.
 
     Returns:
         The summary string returned by :func:`_process_sync`.
     """
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _process_sync, file_path)
+    return await loop.run_in_executor(None, _process_sync, source_id)
 
 
 # ── List & stats ──────────────────────────────────────────────────────────────
 
 
-def _list_sources_sync() -> list[dict]:
-    """
-    Query ChromaDB and aggregate chunk metadata by source file (blocking).
-
-    Returns a list of dicts with keys: ``source``, ``filename``, ``chunk_count``.
-    """
-    client = get_chroma_client()
+def _get_knowledge_list_sync() -> list[dict]:
+    """Sync implementation of get_knowledge_list."""
+    db = SessionLocal()
     try:
-        collection = client.get_collection(name="knowledge_base")
-    except ValueError as err:
-        # Collection does not exist yet — no documents ingested.
-        if "does not exist" not in str(err).lower():
-            raise
-        return []
-
-    result = collection.get(include=["metadatas"])
-    metadatas = result.get("metadatas") or []
-
-    # Group by source file path
-    sources: dict[str, int] = {}
-    for meta in metadatas:
-        src = meta.get("source", "unknown") if meta else "unknown"
-        sources[src] = sources.get(src, 0) + 1
-
-    return [
-        {"source": src, "filename": src.split("/")[-1], "chunk_count": count}
-        for src, count in sorted(sources.items())
-    ]
+        sources = (
+            db.query(KnowledgeSource).order_by(KnowledgeSource.created_at.desc()).all()
+        )
+        # Convert to dicts matching the schema
+        results = []
+        for s in sources:
+            results.append(
+                {
+                    "id": s.id,
+                    "source": s.source,
+                    "filename": s.filename,
+                    "chunk_count": s.chunk_count,
+                    "status": s.status,
+                    "progress": s.progress,
+                    "current_step": s.current_step,
+                    "started_at": s.started_at,
+                    "last_indexed_at": s.last_indexed_at,
+                    "error_message": s.error_message,
+                    "features": s.features or [],
+                }
+            )
+        return results
+    finally:
+        db.close()
 
 
 async def get_knowledge_list() -> list[dict]:
     """
-    Async wrapper — returns a list of unique knowledge sources from ChromaDB.
-
-    Each item contains: ``source``, ``filename``, ``chunk_count``.
+    Returns a list of all knowledge sources with their status from SQLite.
     """
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _list_sources_sync)
+    return await asyncio.to_thread(_get_knowledge_list_sync)
+
+
+def _get_knowledge_stats_sync() -> dict:
+    """Sync implementation of get_knowledge_stats."""
+    db = SessionLocal()
+    try:
+        doc_count = db.query(KnowledgeSource).count()
+        chunk_count = (
+            db.query(KnowledgeSource).with_entities(KnowledgeSource.chunk_count).all()
+        )
+        total_chunks = sum(c[0] for c in chunk_count)
+        return {
+            "document_count": doc_count,
+            "chunk_count": total_chunks,
+        }
+    finally:
+        db.close()
 
 
 async def get_knowledge_stats() -> dict:
@@ -238,8 +364,61 @@ async def get_knowledge_stats() -> dict:
 
     Returns a dict with: ``document_count``, ``chunk_count``.
     """
-    items = await get_knowledge_list()
-    return {
-        "document_count": len(items),
-        "chunk_count": sum(i["chunk_count"] for i in items),
-    }
+    return await asyncio.to_thread(_get_knowledge_stats_sync)
+
+
+def create_or_update_knowledge_source(file_path: str) -> int:
+    """
+    Create a new knowledge source record or reset an existing one.
+    Returns the source ID.
+    """
+    db = SessionLocal()
+    try:
+        existing = (
+            db.query(KnowledgeSource)
+            .filter(KnowledgeSource.file_path == file_path)
+            .first()
+        )
+
+        if existing:
+            new_source = existing
+            new_source.status = "pending"
+            new_source.progress = 0.0
+            new_source.current_step = "Queued"
+            new_source.error_message = None
+            # Preserve created_at, update updated_at automatically
+        else:
+            new_source = KnowledgeSource(
+                file_path=file_path, status="pending", current_step="Queued"
+            )
+            db.add(new_source)
+
+        db.commit()
+        db.refresh(new_source)
+        return new_source.id
+    finally:
+        db.close()
+
+
+def refresh_knowledge_source(source_id: int) -> None:
+    """
+    Reset a source to pending state to be picked up by the queue.
+    NOTE: The caller (router) is responsible for enqueuing the task.
+    This function just resets the state in DB.
+    """
+    db = SessionLocal()
+    try:
+        source = (
+            db.query(KnowledgeSource).filter(KnowledgeSource.id == source_id).first()
+        )
+        if not source:
+            raise ValueError(f"Source {source_id} not found")
+
+        source.status = "pending"
+        source.progress = 0.0
+        source.current_step = "Queued for refresh"
+        source.error_message = None
+        source.started_at = None
+        db.commit()
+    finally:
+        db.close()
