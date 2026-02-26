@@ -13,6 +13,7 @@ from gm_shield.core.logging import configure_logging, get_logger
 from gm_shield.shared.database.sqlite import engine, Base
 from gm_shield.features.health import routes as health_routes
 from gm_shield.features.knowledge import router as knowledge_router_module
+from gm_shield.features.notes import routes as notes_routes
 from gm_shield.core.telemetry import setup_telemetry
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -45,6 +46,10 @@ _TAGS_METADATA = [
     {
         "name": "Health",
         "description": "Infrastructure health checks for SQLite, ChromaDB, and Ollama.",
+    },
+    {
+        "name": "Notes",
+        "description": "Create, update, and organise markdown notes with tags and metadata.",
     },
 ]
 
@@ -132,4 +137,10 @@ app.include_router(
     knowledge_router_module.router,
     prefix=f"{settings.API_V1_STR}/knowledge",
     tags=["Knowledge"],
+)
+
+app.include_router(
+    notes_routes.router,
+    prefix=f"{settings.API_V1_STR}/notes",
+    tags=["Notes"],
 )
