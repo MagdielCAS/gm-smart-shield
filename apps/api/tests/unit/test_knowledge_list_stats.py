@@ -52,7 +52,9 @@ async def test_get_knowledge_list_returns_grouped_sources(mock_chroma):
 @pytest.mark.asyncio
 async def test_get_knowledge_list_empty_when_no_collection(mock_chroma):
     """Returns an empty list when the ChromaDB collection does not exist yet."""
-    mock_chroma.return_value.get_collection.side_effect = Exception("no collection")
+    mock_chroma.return_value.get_collection.side_effect = ValueError(
+        "Collection knowledge_base does not exist"
+    )
 
     result = await get_knowledge_list()
 
@@ -133,9 +135,21 @@ async def test_get_knowledge_stats_aggregates_correctly(mock_chroma):
 @pytest.mark.asyncio
 async def test_get_knowledge_stats_zero_when_empty(mock_chroma):
     """Stats are zero when no documents have been ingested."""
-    mock_chroma.return_value.get_collection.side_effect = Exception("no collection")
+    mock_chroma.return_value.get_collection.side_effect = ValueError(
+        "Collection knowledge_base does not exist"
+    )
 
     stats = await get_knowledge_stats()
 
     assert stats["document_count"] == 0
     assert stats["chunk_count"] == 0
+
+
+@patch("gm_shield.features.knowledge.service.get_chroma_client")
+@pytest.mark.asyncio
+async def test_get_knowledge_list_raises_on_non_missing_collection_errors(mock_chroma):
+    """Unexpected ChromaDB errors are raised instead of being masked as empty."""
+    mock_chroma.return_value.get_collection.side_effect = ValueError("permission denied")
+
+    with pytest.raises(ValueError, match="permission denied"):
+        await get_knowledge_list()

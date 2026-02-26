@@ -201,8 +201,10 @@ def _list_sources_sync() -> list[dict]:
     client = get_chroma_client()
     try:
         collection = client.get_collection(name="knowledge_base")
-    except Exception:
+    except ValueError as err:
         # Collection does not exist yet — no documents ingested.
+        if "does not exist" not in str(err).lower():
+            raise
         return []
 
     result = collection.get(include=["metadatas"])
