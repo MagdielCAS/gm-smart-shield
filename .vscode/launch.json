@@ -1,0 +1,66 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API: Debug FastAPI (uvicorn)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["gm_shield.main:app", "--reload", "--port", "8000"],
+      "cwd": "${workspaceFolder}/apps/api",
+      "python": "${workspaceFolder}/apps/api/.venv/bin/python",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/apps/api"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Web: Debug Vite (browser)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/apps/web/src",
+      "preLaunchTask": "web-dev",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./src/*": "${webRoot}/*"
+      }
+    },
+    {
+      "name": "Web: Debug Electron (main process)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/apps/web/node_modules/.bin/electron",
+      "args": [".", "--remote-debugging-port=9223"],
+      "cwd": "${workspaceFolder}/apps/web",
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/apps/web/dist-electron/**/*.js"],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/apps/web/dist-electron/**",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Web: Debug Electron (renderer via Chrome)",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9223,
+      "webRoot": "${workspaceFolder}/apps/web/src",
+      "sourceMaps": true,
+      "timeout": 15000
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack: API + Electron",
+      "configurations": [
+        "API: Debug FastAPI (uvicorn)",
+        "Web: Debug Electron (main process)",
+        "Web: Debug Electron (renderer via Chrome)"
+      ],
+      "stopAll": true
+    }
+  ]
+}
