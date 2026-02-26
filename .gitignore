@@ -210,6 +210,9 @@ __marimo__/
 data/
 
 # Electron
-apps/web/dist-electron/
-apps/web/dist-app/
-!apps/web/src/lib/
+apps/web/dist-electron/**
+apps/web/dist-app/**
+!apps/web/src/lib
+
+# Node
+**/node_modules

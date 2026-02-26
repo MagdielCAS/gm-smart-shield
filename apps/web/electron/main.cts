@@ -1,9 +1,12 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-import path from 'path';
+import path from 'node:path';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-  app.quit();
+// electron-squirrel-startup is only available in packaged Windows builds.
+try {
+  if (require('electron-squirrel-startup')) app.quit();
+} catch {
+  // Not a Windows installer build — safe to ignore.
 }
 
 const createWindow = () => {

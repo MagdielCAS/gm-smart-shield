@@ -3,11 +3,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const node_path_1 = __importDefault(require("node:path"));
 const electron_1 = require("electron");
-const path_1 = __importDefault(require("path"));
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-    electron_1.app.quit();
+// electron-squirrel-startup is only available in packaged Windows builds.
+try {
+    if (require('electron-squirrel-startup'))
+        electron_1.app.quit();
+}
+catch {
+    // Not a Windows installer build — safe to ignore.
 }
 const createWindow = () => {
     // Create the browser window.
@@ -15,7 +20,7 @@ const createWindow = () => {
         width: 1200,
         height: 800,
         webPreferences: {
-            preload: path_1.default.join(__dirname, 'preload.cjs'),
+            preload: node_path_1.default.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
             contextIsolation: true,
         },
@@ -27,7 +32,7 @@ const createWindow = () => {
         mainWindow.webContents.openDevTools();
     }
     else {
-        mainWindow.loadFile(path_1.default.join(__dirname, '../dist/index.html'));
+        mainWindow.loadFile(node_path_1.default.join(__dirname, '../dist/index.html'));
     }
 };
 // This method will be called when Electron has finished
