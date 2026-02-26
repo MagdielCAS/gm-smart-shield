@@ -9,10 +9,14 @@ from sqlalchemy.orm import Session
 
 from gm_shield.features.notes.models import (
     NoteCreateRequest,
+    NoteInlineSuggestionRequest,
+    NoteInlineSuggestionResponse,
     NoteLinkSuggestionRequest,
     NoteLinkSuggestionResponse,
     NoteListResponse,
     NoteResponse,
+    NoteTransformRequest,
+    NoteTransformResponse,
     NoteUpdateRequest,
 )
 from gm_shield.features.notes import service
@@ -86,6 +90,31 @@ def delete_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> Respons
     service.delete_note(db, note_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+
+
+
+@router.post(
+    "/inline-suggest",
+    response_model=NoteInlineSuggestionResponse,
+    summary="Suggest inline continuation",
+    description="Generates lightweight ghost-text suggestions for in-editor phrase boundaries.",
+    responses={200: {"description": "Inline suggestion generated."}},
+)
+def inline_suggest_endpoint(payload: NoteInlineSuggestionRequest) -> NoteInlineSuggestionResponse:
+    """Generate an inline ghost-text suggestion from draft content."""
+    return service.suggest_inline_text(payload)
+
+
+@router.post(
+    "/transform/preview",
+    response_model=NoteTransformResponse,
+    summary="Preview note transformation",
+    description="Returns a non-destructive preview for a context action on selected text.",
+    responses={200: {"description": "Transformation preview generated."}, 422: {"description": "Unsupported action."}},
+)
+def preview_transform_endpoint(payload: NoteTransformRequest) -> NoteTransformResponse:
+    """Return a context-menu transformation preview."""
+    return service.preview_transform(payload)
 
 @router.post(
     "/{note_id}/links/suggest",

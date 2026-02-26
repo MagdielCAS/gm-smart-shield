@@ -153,3 +153,41 @@ def test_note_link_suggestions_endpoint(client, monkeypatch):
     assert payload["suggestions"][0]["chunk_id"] == "chunk-0"
     assert payload["suggestions"][0]["page_number"] == 1
     assert payload["suggestions"][0]["similarity_score"] == 1.0
+
+
+def test_note_editor_assist_endpoints(client):
+    """Return inline suggestion and non-destructive transformation previews."""
+    inline_response = client.post(
+        "/api/v1/notes/inline-suggest",
+        json={"content": "The caravan vanished.", "cursor_index": 20},
+    )
+    assert inline_response.status_code == 200
+    inline_payload = inline_response.json()
+    assert inline_payload["reason"] in {"punctuation", "idle"}
+    assert inline_payload["suggestion"].strip()
+
+    transform_response = client.post(
+        "/api/v1/notes/transform/preview",
+        json={
+            "action": "make_dramatic",
+            "content": "The caravan vanished in the pass.",
+            "selection_start": 4,
+            "selection_end": 20,
+        },
+    )
+    assert transform_response.status_code == 200
+    transform_payload = transform_response.json()
+    assert transform_payload["action"] == "make_dramatic"
+    assert transform_payload["original_text"] == "caravan vanished"
+    assert "ominous intent" in transform_payload["preview_text"]
+
+    unsupported_response = client.post(
+        "/api/v1/notes/transform/preview",
+        json={
+            "action": "improvise",
+            "content": "The caravan vanished in the pass.",
+            "selection_start": 0,
+            "selection_end": 0,
+        },
+    )
+    assert unsupported_response.status_code == 422
