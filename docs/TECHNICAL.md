@@ -389,7 +389,7 @@ page: 96
 |---|---|---|
 | `/api/knowledge` | Knowledge Sources | Upload, list, delete documents |
 | `/api/chat` | Query Agent | Submit questions, get answers |
-| `/api/notes` | Notes | CRUD for GM notes |
+| `/api/v1/notes` | Notes | CRUD, inline assist, and source-link workflows for GM notes |
 | `/api/references` | Quick References | List, fetch quick reference cards |
 | `/api/sheets` | Character Sheets | Templates and player sheets |
 | `/api/encounters` | Encounter Generator | Generate and save encounters |
@@ -405,11 +405,14 @@ GET    /api/knowledge/{id}/status     Check processing status
 
 POST   /api/chat/query                Submit a question (RAG Q&A)
 
-GET    /api/notes                     List all notes
-POST   /api/notes                     Create a note
-GET    /api/notes/{id}                Get a note
-PUT    /api/notes/{id}                Update a note (triggers auto-tagging)
-DELETE /api/notes/{id}                Delete a note
+GET    /api/v1/notes                  List all notes
+POST   /api/v1/notes                  Create a note
+GET    /api/v1/notes/{id}             Get a note
+PUT    /api/v1/notes/{id}             Update a note (refreshes deterministic tags/metadata)
+DELETE /api/v1/notes/{id}             Delete a note
+POST   /api/v1/notes/{id}/links/suggest Suggest structured source links from knowledge chunks
+POST   /api/v1/notes/inline-suggest   Return phrase-boundary ghost-text suggestions
+POST   /api/v1/notes/transform/preview Preview context-menu rewrite/format/reference actions
 
 GET    /api/references                List all quick references
 GET    /api/references?category=spell Filter by category
@@ -465,7 +468,7 @@ sequenceDiagram
 
 ---
 
-## 9. Note Auto-Tagging Flow
+## 9. Notes Create/Edit + Assist Flow
 
 ```mermaid
 sequenceDiagram
@@ -475,17 +478,22 @@ sequenceDiagram
     participant Chroma as ChromaDB
     participant DB as SQLite
 
-    GM->>API: PUT /api/notes/{id} (content)
-    API->>DB: Save note content
-    API->>Queue: Enqueue tagging task
+    GM->>API: POST /api/v1/notes (markdown + optional frontmatter/tags/sources)
+    API->>API: Parse markdown frontmatter + deterministic tag extraction
+    API->>DB: Save note, tags, and accepted source links
+    API-->>GM: 201 Created
+
+    GM->>API: PUT /api/v1/notes/{id} (updated content)
+    API->>API: Re-run extraction and merge explicit metadata fields
+    API->>DB: Persist note + bump updated_at on content change
     API-->>GM: 200 OK
 
-    Queue->>TagAgent: Process note content
-    TagAgent->>TagAgent: Extract keywords + entities via LLM
-    TagAgent->>Chroma: Semantic search: keywords → knowledge chunks
-    Chroma-->>TagAgent: Matching chunks (source_id, page)
-    TagAgent->>DB: Save NoteTag records (tag, source_id, page)
-    TagAgent->>DB: Update Note frontmatter with tags
+    GM->>API: POST /api/v1/notes/{id}/links/suggest
+    API->>Chroma: Blend semantic similarity with keyword overlap
+    API-->>GM: Suggested source links (chunk + page metadata)
+
+    GM->>API: POST /api/v1/notes/inline-suggest or /transform/preview
+    API-->>GM: Local assist responses for ghost text and context actions
 ```
 
 ---
