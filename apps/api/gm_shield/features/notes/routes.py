@@ -45,7 +45,9 @@ def list_notes_endpoint(db: Session = Depends(get_db)) -> NoteListResponse:
     description="Creates a new markdown note with optional frontmatter and tags.",
     responses={201: {"description": "Note created successfully."}},
 )
-def create_note_endpoint(payload: NoteCreateRequest, db: Session = Depends(get_db)) -> NoteResponse:
+def create_note_endpoint(
+    payload: NoteCreateRequest, db: Session = Depends(get_db)
+) -> NoteResponse:
     """Create and return a note."""
     return service.create_note(db, payload)
 
@@ -55,7 +57,10 @@ def create_note_endpoint(payload: NoteCreateRequest, db: Session = Depends(get_d
     response_model=NoteResponse,
     summary="Get note",
     description="Returns a single note by its identifier.",
-    responses={200: {"description": "Note retrieved successfully."}, 404: {"description": "Note not found."}},
+    responses={
+        200: {"description": "Note retrieved successfully."},
+        404: {"description": "Note not found."},
+    },
 )
 def get_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> NoteResponse:
     """Fetch one note by ID."""
@@ -67,7 +72,10 @@ def get_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> NoteRespon
     response_model=NoteResponse,
     summary="Update note",
     description="Replaces an existing note and updates its modification timestamp.",
-    responses={200: {"description": "Note updated successfully."}, 404: {"description": "Note not found."}},
+    responses={
+        200: {"description": "Note updated successfully."},
+        404: {"description": "Note not found."},
+    },
 )
 def update_note_endpoint(
     note_id: int,
@@ -83,7 +91,10 @@ def update_note_endpoint(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete note",
     description="Deletes a note by identifier.",
-    responses={204: {"description": "Note deleted successfully."}, 404: {"description": "Note not found."}},
+    responses={
+        204: {"description": "Note deleted successfully."},
+        404: {"description": "Note not found."},
+    },
 )
 def delete_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> Response:
     """Delete a note and return an empty response."""
@@ -98,7 +109,9 @@ def delete_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> Respons
     description="Generates lightweight ghost-text suggestions for in-editor phrase boundaries.",
     responses={200: {"description": "Inline suggestion generated."}},
 )
-def inline_suggest_endpoint(payload: NoteInlineSuggestionRequest) -> NoteInlineSuggestionResponse:
+def inline_suggest_endpoint(
+    payload: NoteInlineSuggestionRequest,
+) -> NoteInlineSuggestionResponse:
     """Generate an inline ghost-text suggestion from draft content."""
     return service.suggest_inline_text(payload)
 
@@ -108,18 +121,25 @@ def inline_suggest_endpoint(payload: NoteInlineSuggestionRequest) -> NoteInlineS
     response_model=NoteTransformResponse,
     summary="Preview note transformation",
     description="Returns a non-destructive preview for a context action on selected text.",
-    responses={200: {"description": "Transformation preview generated."}, 422: {"description": "Unsupported action."}},
+    responses={
+        200: {"description": "Transformation preview generated."},
+        422: {"description": "Unsupported action."},
+    },
 )
 def preview_transform_endpoint(payload: NoteTransformRequest) -> NoteTransformResponse:
     """Return a context-menu transformation preview."""
     return service.preview_transform(payload)
+
 
 @router.post(
     "/{note_id}/links/suggest",
     response_model=NoteLinkSuggestionResponse,
     summary="Suggest note links",
     description="Suggests knowledge-source links for a note using semantic and keyword matching.",
-    responses={200: {"description": "Link suggestions generated."}, 404: {"description": "Note not found."}},
+    responses={
+        200: {"description": "Link suggestions generated."},
+        404: {"description": "Note not found."},
+    },
 )
 def suggest_note_links_endpoint(
     note_id: int,

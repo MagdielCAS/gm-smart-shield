@@ -66,7 +66,10 @@ class NoteLink(Base):
     __tablename__ = "note_links"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    note_id: Mapped[int] = mapped_column(ForeignKey("notes.id", ondelete="CASCADE"), nullable=False)
+    note_id: Mapped[int] = mapped_column(
+        ForeignKey("notes.id", ondelete="CASCADE"), nullable=False
+    )
+    tag: Mapped[str] = mapped_column(String(80), nullable=False)
     source_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source_file: Mapped[str | None] = mapped_column(String(512), nullable=True)
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -3,7 +3,10 @@
 from pytest_bdd import given, scenario, then, when
 
 
-@scenario("../notes_flow.feature", "Create, update, and enrich note with tags and source links")
+@scenario(
+    "../notes_flow.feature",
+    "Create, update, and enrich note with tags and source links",
+)
 def test_notes_create_update_tag_link_flow() -> None:
     """Run the end-to-end notes create/update/tag/link flow scenario."""
 
@@ -44,6 +47,7 @@ def update_note(notes_context) -> None:
             "session_id": "s12",
             "sources": [
                 {
+                    "tag": "location",
                     "source_id": "sword-coast-guide",
                     "source_file": "/data/sword-coast-guide.pdf",
                     "page_number": 88,

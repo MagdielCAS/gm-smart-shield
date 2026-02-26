@@ -107,7 +107,9 @@ def _parse_markdown_frontmatter(content: str) -> tuple[dict[str, Any], str]:
 def _extract_deterministic_tags(markdown_body: str) -> tuple[list[str], dict[str, Any]]:
     """Extract tags and metadata using deterministic token/entity heuristics."""
     hashtag_tags = re.findall(r"(?<!\w)#([A-Za-z][\w-]{1,30})", markdown_body)
-    titlecase_entities = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b", markdown_body)
+    titlecase_entities = re.findall(
+        r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b", markdown_body
+    )
     words = re.findall(r"[A-Za-z][A-Za-z'-]{2,}", markdown_body.lower())
 
     frequencies: dict[str, int] = {}
@@ -116,8 +118,15 @@ def _extract_deterministic_tags(markdown_body: str) -> tuple[list[str], dict[str
             continue
         frequencies[word] = frequencies.get(word, 0) + 1
 
-    keyword_tags = [token for token, _ in sorted(frequencies.items(), key=lambda item: (-item[1], item[0]))[:5]]
-    entity_tags = [entity.lower().replace(" ", "-") for entity in titlecase_entities[:5]]
+    keyword_tags = [
+        token
+        for token, _ in sorted(
+            frequencies.items(), key=lambda item: (-item[1], item[0])
+        )[:5]
+    ]
+    entity_tags = [
+        entity.lower().replace(" ", "-") for entity in titlecase_entities[:5]
+    ]
     extracted_tags = _dedupe_tags(hashtag_tags + entity_tags + keyword_tags)
     metadata = {
         "word_count": len(words),
@@ -146,7 +155,9 @@ def _extract_llm_tags_if_available(markdown_body: str) -> list[str]:
         return []
 
 
-def _run_note_enrichment(content: str, explicit_tags: list[str]) -> tuple[list[str], dict[str, Any], str]:
+def _run_note_enrichment(
+    content: str, explicit_tags: list[str]
+) -> tuple[list[str], dict[str, Any], str]:
     """Parse markdown/frontmatter, then enrich tags using deterministic and optional LLM steps."""
     inline_frontmatter, markdown_body = _parse_markdown_frontmatter(content)
     deterministic_tags, extracted_metadata = _extract_deterministic_tags(markdown_body)
@@ -188,7 +199,9 @@ def _safe_slice(content: str, start: int, end: int) -> tuple[int, int, str]:
     return clamped_start, clamped_end, content[clamped_start:clamped_end]
 
 
-def suggest_inline_text(payload: NoteInlineSuggestionRequest) -> NoteInlineSuggestionResponse:
+def suggest_inline_text(
+    payload: NoteInlineSuggestionRequest,
+) -> NoteInlineSuggestionResponse:
     """Generate ghost-text continuation for phrase-boundary editor events.
 
     Args:
@@ -232,15 +245,22 @@ def preview_transform(payload: NoteTransformRequest) -> NoteTransformResponse:
         HTTPException: If action is unsupported or selection bounds are invalid.
     """
     if payload.action not in TRANSFORM_ACTIONS:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unsupported action")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Unsupported action",
+        )
 
-    start, end, selected_text = _safe_slice(payload.content, payload.selection_start, payload.selection_end)
+    start, end, selected_text = _safe_slice(
+        payload.content, payload.selection_start, payload.selection_end
+    )
     base_text = selected_text.strip() or payload.content.strip()
     if payload.action == NoteTransformAction.REWRITE:
         preview = f"{base_text} (rewritten for clarity)"
         mode = "replace"
     elif payload.action == NoteTransformAction.FORMAT:
-        preview = "\n".join(line.strip() for line in base_text.splitlines() if line.strip())
+        preview = "\n".join(
+            line.strip() for line in base_text.splitlines() if line.strip()
+        )
         mode = "replace"
     elif payload.action == NoteTransformAction.MAKE_DRAMATIC:
         preview = f"⚔️ {base_text} The air crackles with ominous intent."
@@ -270,8 +290,12 @@ def preview_transform(payload: NoteTransformRequest) -> NoteTransformResponse:
 
 def _to_response(note: Note) -> NoteResponse:
     """Convert a ``Note`` ORM entity to an API response schema."""
-    parsed_frontmatter = json.loads(note.frontmatter_json) if note.frontmatter_json else None
-    extracted_metadata = parsed_frontmatter.get("_extracted", {}) if parsed_frontmatter else {}
+    parsed_frontmatter = (
+        json.loads(note.frontmatter_json) if note.frontmatter_json else None
+    )
+    extracted_metadata = (
+        parsed_frontmatter.get("_extracted", {}) if parsed_frontmatter else {}
+    )
     return NoteResponse(
         id=note.id,
         title=note.title,
@@ -284,6 +308,7 @@ def _to_response(note: Note) -> NoteResponse:
         tags=[tag.tag for tag in note.tags],
         links=[
             NoteLinkMetadata(
+                tag=link.tag,
                 source_id=link.source_id,
                 source_file=link.source_file,
                 page_number=link.page_number,
@@ -300,6 +325,7 @@ def _assign_links(note: Note, links: list[NoteLinkMetadata]) -> None:
     for link in links:
         note.links.append(
             NoteLink(
+                tag=link.tag,
                 source_id=link.source_id,
                 source_file=link.source_file,
                 page_number=link.page_number,
@@ -319,11 +345,15 @@ def create_note(db: Session, payload: NoteCreateRequest) -> NoteResponse:
     Returns:
         Created note as a response schema.
     """
-    inferred_tags, extracted_metadata, normalized_content = _run_note_enrichment(payload.content, payload.tags)
+    inferred_tags, extracted_metadata, normalized_content = _run_note_enrichment(
+        payload.content, payload.tags
+    )
 
     frontmatter = payload.frontmatter.copy() if payload.frontmatter else {}
     if extracted_metadata:
-        frontmatter.update({k: v for k, v in extracted_metadata.items() if k not in frontmatter})
+        frontmatter.update(
+            {k: v for k, v in extracted_metadata.items() if k not in frontmatter}
+        )
     if payload.campaign_id is not None:
         frontmatter.setdefault("campaign_id", payload.campaign_id)
     if payload.session_id is not None:
@@ -374,7 +404,9 @@ def get_note(db: Session, note_id: int) -> NoteResponse:
     """
     note = db.get(Note, note_id)
     if note is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+        )
     return _to_response(note)
 
 
@@ -395,13 +427,19 @@ def update_note(db: Session, note_id: int, payload: NoteUpdateRequest) -> NoteRe
     """
     note = db.get(Note, note_id)
     if note is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+        )
 
-    inferred_tags, extracted_metadata, normalized_content = _run_note_enrichment(payload.content, payload.tags)
+    inferred_tags, extracted_metadata, normalized_content = _run_note_enrichment(
+        payload.content, payload.tags
+    )
 
     frontmatter = payload.frontmatter.copy() if payload.frontmatter else {}
     if extracted_metadata:
-        frontmatter.update({k: v for k, v in extracted_metadata.items() if k not in frontmatter})
+        frontmatter.update(
+            {k: v for k, v in extracted_metadata.items() if k not in frontmatter}
+        )
     if payload.campaign_id is not None:
         frontmatter.setdefault("campaign_id", payload.campaign_id)
     if payload.session_id is not None:
@@ -445,7 +483,9 @@ def suggest_note_links(
     """
     note = db.get(Note, note_id)
     if note is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+        )
 
     note_keywords = _keywords(note.content_markdown)
     if not note_keywords:
@@ -471,14 +511,20 @@ def suggest_note_links(
     metadatas = semantic_results.get("metadatas", [[]])[0]
     distances = semantic_results.get("distances", [[]])[0]
 
-    for chunk_id, document, metadata, distance in zip(ids, documents, metadatas, distances):
+    for chunk_id, document, metadata, distance in zip(
+        ids, documents, metadatas, distances
+    ):
         doc_keywords = _keywords(document or "")
         keyword_overlap = len(note_keywords.intersection(doc_keywords))
-        similarity_score = max(0.0, min(1.0, 1.0 - float(distance if distance is not None else 1.0)))
+        similarity_score = max(
+            0.0, min(1.0, 1.0 - float(distance if distance is not None else 1.0))
+        )
         candidates[chunk_id] = {
-            "source_id": (metadata or {}).get("source_id") or (metadata or {}).get("source"),
+            "source_id": (metadata or {}).get("source_id")
+            or (metadata or {}).get("source"),
             "source_file": (metadata or {}).get("source"),
-            "page_number": (metadata or {}).get("page") or (metadata or {}).get("page_number"),
+            "page_number": (metadata or {}).get("page")
+            or (metadata or {}).get("page_number"),
             "chunk_id": chunk_id,
             "snippet": (document or "")[:280],
             "similarity_score": similarity_score,
@@ -496,16 +542,20 @@ def suggest_note_links(
             continue
         if chunk_id not in candidates:
             candidates[chunk_id] = {
-                "source_id": (metadata or {}).get("source_id") or (metadata or {}).get("source"),
+                "source_id": (metadata or {}).get("source_id")
+                or (metadata or {}).get("source"),
                 "source_file": (metadata or {}).get("source"),
-                "page_number": (metadata or {}).get("page") or (metadata or {}).get("page_number"),
+                "page_number": (metadata or {}).get("page")
+                or (metadata or {}).get("page_number"),
                 "chunk_id": chunk_id,
                 "snippet": (document or "")[:280],
                 "similarity_score": 0.0,
                 "keyword_overlap": keyword_overlap,
             }
         else:
-            candidates[chunk_id]["keyword_overlap"] = max(candidates[chunk_id]["keyword_overlap"], keyword_overlap)
+            candidates[chunk_id]["keyword_overlap"] = max(
+                candidates[chunk_id]["keyword_overlap"], keyword_overlap
+            )
 
     ranked = sorted(
         candidates.values(),
@@ -523,7 +573,9 @@ def delete_note(db: Session, note_id: int) -> None:
     """Delete an existing note."""
     note = db.get(Note, note_id)
     if note is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+        )
 
     db.delete(note)
     db.commit()
