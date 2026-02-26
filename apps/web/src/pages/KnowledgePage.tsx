@@ -388,7 +388,11 @@ const KnowledgePage = () => {
 											<div>
 												<p className="font-medium break-all">{item.filename}</p>
 												<p className="text-xs text-muted-foreground mt-0.5">
-													{item.source}
+													{item.source} •{" "}
+													<span>
+														{item.chunk_count}{" "}
+														{item.chunk_count === 1 ? "chunk" : "chunks"}
+													</span>
 												</p>
 
 												{/* Features Pills */}
@@ -413,7 +417,7 @@ const KnowledgePage = () => {
 													title="Refresh source"
 												>
 													<GlassButton
-														size="icon"
+														size="sm"
 														variant="ghost"
 														className="h-8 w-8"
 														onClick={(e) => {
