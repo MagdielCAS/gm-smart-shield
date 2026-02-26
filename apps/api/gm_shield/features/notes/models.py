@@ -12,22 +12,27 @@ from pydantic import BaseModel, Field
 
 
 class NoteLinkMetadata(BaseModel):
-    """Link metadata describing where a tagged note reference came from."""
+    """Link metadata describing where a note reference came from."""
 
-    tag: str = Field(
-        ...,
-        description="Tag associated with the note link.",
-        examples=["npc"],
-    )
     source_id: str | None = Field(
         default=None,
         description="Optional knowledge/source identifier this tag originated from.",
         examples=["monster-manual"],
     )
+    source_file: str | None = Field(
+        default=None,
+        description="Optional source file path for the linked chunk.",
+        examples=["/data/rules/monster-manual.pdf"],
+    )
     page_number: int | None = Field(
         default=None,
         description="Optional page number in the source document.",
         examples=[42],
+    )
+    chunk_id: str | None = Field(
+        default=None,
+        description="Optional Chroma chunk/document identifier for the source.",
+        examples=["monster-manual_a1b2c3d4_7"],
     )
 
 
@@ -69,6 +74,10 @@ class NoteBasePayload(BaseModel):
         default=None,
         description="Optional free-form frontmatter metadata.",
         examples=[{"location": "Yawning Portal", "mood": "tense"}],
+    )
+    sources: list[NoteLinkMetadata] = Field(
+        default_factory=list,
+        description="Accepted structured source links associated with this note.",
     )
 
 
@@ -114,3 +123,28 @@ class NoteListResponse(BaseModel):
     """Response schema for listing notes."""
 
     items: list[NoteResponse] = Field(default_factory=list, description="Collection of notes.")
+
+
+class NoteLinkSuggestionRequest(BaseModel):
+    """Payload requesting link suggestions for a note."""
+
+    limit: int = Field(default=5, ge=1, le=20, description="Maximum number of suggested links.")
+
+
+class NoteLinkSuggestion(BaseModel):
+    """A suggested link candidate derived from knowledge chunks."""
+
+    source_id: str | None = Field(default=None, description="Best-effort source identifier.")
+    source_file: str | None = Field(default=None, description="Best-effort source file path.")
+    page_number: int | None = Field(default=None, description="Best-effort source page number.")
+    chunk_id: str | None = Field(default=None, description="Suggested Chroma chunk identifier.")
+    snippet: str = Field(..., description="Chunk text snippet used for suggestion context.")
+    similarity_score: float = Field(..., description="Semantic similarity score in range [0,1].")
+    keyword_overlap: int = Field(..., description="Count of overlapping keywords with note content.")
+
+
+class NoteLinkSuggestionResponse(BaseModel):
+    """Response payload containing suggested links for a note."""
+
+    note_id: int = Field(..., description="Note identifier used to generate suggestions.")
+    suggestions: list[NoteLinkSuggestion] = Field(default_factory=list, description="Suggested source links.")
