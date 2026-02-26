@@ -7,6 +7,7 @@
 		"module": "ESNext",
 		"types": ["vite/client", "@testing-library/jest-dom"],
 		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
 
 		/* Bundler mode */
 		"moduleResolution": "bundler",
@@ -25,11 +26,9 @@
 		"noUncheckedSideEffectImports": true,
 
 		/* Paths */
-		"baseUrl": ".",
 		"paths": {
 			"@/*": ["./src/*"]
 		}
 	},
-	"include": ["src"],
-	"exclude": ["src/**/*.test.tsx", "src/**/*.test.ts"]
+	"include": ["src"]
 }
