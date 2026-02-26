@@ -11,7 +11,6 @@ Supported file formats: PDF (.pdf), plain text (.txt), Markdown (.md), CSV (.csv
 """
 
 import asyncio
-import logging
 import uuid
 from pathlib import Path
 
@@ -20,8 +19,9 @@ from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from gm_shield.shared.database.chroma import get_chroma_client
+from gm_shield.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # ── Embedding model ──────────────────────────────────────────────────────────
 # Using a lightweight local model that runs entirely offline.
@@ -42,7 +42,7 @@ def get_embedding_model() -> SentenceTransformer:
     """
     global _embedding_model
     if _embedding_model is None:
-        logger.info(f"Loading embedding model: {EMBEDDING_MODEL_NAME}")
+        logger.info("embedding_model_loading", model=EMBEDDING_MODEL_NAME)
         _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
     return _embedding_model
 
@@ -98,7 +98,7 @@ def extract_text_from_file(file_path: str) -> str:
             raise ValueError(f"Unsupported file type: {ext}")
 
     except Exception as e:
-        logger.error(f"Error extracting text from {file_path}: {e}")
+        logger.error("text_extraction_failed", file_path=file_path, error=str(e))
         raise
 
 
@@ -124,12 +124,12 @@ def _process_sync(file_path: str) -> str:
     Returns:
         A summary string, e.g. ``"Processed 42 chunks"``.
     """
-    logger.info(f"Starting processing for {file_path}")
+    logger.info("ingestion_started", file_path=file_path)
 
     # Step 1 — Extract
     text = extract_text_from_file(file_path)
     if not text.strip():
-        logger.warning(f"No text extracted from {file_path}")
+        logger.warning("no_text_extracted", file_path=file_path)
         return "No text content found"
 
     # Step 2 — Chunk
@@ -140,7 +140,7 @@ def _process_sync(file_path: str) -> str:
         length_function=len,
     )
     chunks = text_splitter.split_text(text)
-    logger.info(f"Generated {len(chunks)} chunks from {file_path}")
+    logger.info("chunks_generated", file_path=file_path, chunk_count=len(chunks))
 
     if not chunks:
         return "No chunks generated"
@@ -165,7 +165,7 @@ def _process_sync(file_path: str) -> str:
         ids=ids,
     )
 
-    logger.info(f"Successfully stored {len(chunks)} chunks in ChromaDB")
+    logger.info("ingestion_complete", file_path=file_path, chunk_count=len(chunks))
     return f"Processed {len(chunks)} chunks"
 
 

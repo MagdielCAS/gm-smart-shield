@@ -9,10 +9,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from gm_shield.core.config import settings
+from gm_shield.core.logging import configure_logging, get_logger
 from gm_shield.shared.database.sqlite import engine, Base
 from gm_shield.features.health import routes as health_routes
 from gm_shield.features.knowledge import router as knowledge_router_module
 from gm_shield.core.telemetry import setup_telemetry
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+# Configure structlog once at import time so every module that obtains a logger
+# via get_logger(__name__) shares the same processor chain.
+configure_logging()
+logger = get_logger(__name__)
 
 _DESCRIPTION = """
 **GM Smart Shield** is a locally-hosted AI assistant for tabletop Game Masters.
@@ -52,12 +59,12 @@ async def lifespan(app: FastAPI):
     On shutdown: performs any necessary cleanup (currently a no-op).
     """
     Base.metadata.create_all(bind=engine)
-    print(f"Database initialized at {settings.SQLITE_URL}")
-    print(f"ChromaDB initialized at {settings.CHROMA_PERSIST_DIRECTORY}")
+    logger.info("database_initialized", url=settings.SQLITE_URL)
+    logger.info("chroma_initialized", path=settings.CHROMA_PERSIST_DIRECTORY)
 
     yield
 
-    print("Shutting down...")
+    logger.info("shutdown")
 
 
 app = FastAPI(

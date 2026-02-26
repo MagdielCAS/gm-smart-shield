@@ -204,6 +204,67 @@ class KnowledgeSourceCreate(BaseModel):
 
 ---
 
+## Logging
+
+The API uses **structlog** for all structured logging.  Never use `print()` or
+`logging.getLogger` directly in application code.
+
+### Obtaining a logger
+
+Import from `gm_shield.core.logging` at the top of every module that needs logging:
+
+```python
+from gm_shield.core.logging import get_logger
+
+logger = get_logger(__name__)
+```
+
+### Emitting events
+
+Use **keyword arguments** for all structured context — never f-strings:
+
+```python
+# ✅ correct — fields are individually queryable
+logger.info("ingestion_started", file_path=file_path)
+logger.warning("no_text_extracted", file_path=file_path)
+logger.error("text_extraction_failed", file_path=file_path, error=str(e))
+
+# ❌ wrong — message is unstructured; impossible to filter/query
+logger.info(f"Starting processing for {file_path}")
+```
+
+Choose **snake_case event names** that describe what happened, not status messages:
+
+| Good | Avoid |
+|---|---|
+| `"ingestion_started"` | `"Starting processing..."` |
+| `"sqlite_ok"` | `"Database is healthy"` |
+| `"ollama_model_missing"` | `f"Model {name} not found"` |
+
+### Log level guidance
+
+| Level | When to use |
+|---|---|
+| `debug` | Detailed internal state useful during development only |
+| `info` | Normal operational events (startup, healthy checks, job complete) |
+| `warning` | Recoverable degradation (missing model, empty file, retried call) |
+| `error` | Unrecoverable failure — typically just before raising an exception |
+
+### Configuration
+
+`configure_logging()` in `gm_shield/core/logging.py` is called **once** in
+`main.py` at import time.  It honours two optional environment variables:
+
+| Variable | Default | Options |
+|---|---|---|
+| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `LOG_FORMAT` | `console` | `console` (coloured), `json` (newline-delimited JSON) |
+
+Set `LOG_FORMAT=json` in production / container environments so log aggregators
+(e.g. CloudWatch, Loki) can parse fields natively.
+
+---
+
 ## Testing rules
 
 - Test framework: `pytest` (+ `pytest-asyncio`, `pytest-bdd`).

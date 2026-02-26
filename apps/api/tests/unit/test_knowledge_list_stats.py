@@ -149,7 +149,9 @@ async def test_get_knowledge_stats_zero_when_empty(mock_chroma):
 @pytest.mark.asyncio
 async def test_get_knowledge_list_raises_on_non_missing_collection_errors(mock_chroma):
     """Unexpected ChromaDB errors are raised instead of being masked as empty."""
-    mock_chroma.return_value.get_collection.side_effect = ValueError("permission denied")
+    mock_chroma.return_value.get_collection.side_effect = ValueError(
+        "permission denied"
+    )
 
     with pytest.raises(ValueError, match="permission denied"):
         await get_knowledge_list()

@@ -18,6 +18,9 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import make_asgi_app
 
 from gm_shield.core.config import settings
+from gm_shield.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def setup_telemetry(app: FastAPI) -> None:
@@ -53,4 +56,4 @@ def setup_telemetry(app: FastAPI) -> None:
     metrics_app = make_asgi_app()
     app.mount("/metrics", metrics_app)
 
-    print("Telemetry enabled: Metrics exposed at /metrics")
+    logger.info("telemetry_enabled", endpoint="/metrics")

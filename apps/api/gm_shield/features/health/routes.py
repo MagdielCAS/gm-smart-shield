@@ -18,9 +18,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from gm_shield.core.config import settings
+from gm_shield.core.logging import get_logger
 from gm_shield.shared.database.sqlite import get_db
 from gm_shield.shared.database.chroma import get_chroma_client
 
+logger = get_logger(__name__)
 router = APIRouter()
 
 
@@ -101,7 +103,9 @@ async def check_health_status(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         health.database = True
+        logger.info("sqlite_ok")
     except Exception as e:
+        logger.warning("sqlite_error", error=str(e))
         health.errors.append(f"SQLite error: {str(e)}")
 
     # Check ChromaDB connectivity
@@ -109,7 +113,9 @@ async def check_health_status(db: Session = Depends(get_db)):
         chroma_client = get_chroma_client()
         chroma_client.heartbeat()
         health.chroma = True
+        logger.info("chroma_ok")
     except Exception as e:
+        logger.warning("chroma_error", error=str(e))
         health.errors.append(f"ChromaDB error: {str(e)}")
 
     # Check Ollama connectivity and required model availability
@@ -132,6 +138,7 @@ async def check_health_status(db: Session = Depends(get_db)):
                 health.ollama = True
                 data = response.json()
                 available_models = [m.get("name", "") for m in data.get("models", [])]
+                logger.info("ollama_ok", available_models=available_models)
 
                 for required in required_models:
                     # Exact match first; fall back to prefix match (e.g. "llama3.2:3b" in "llama3.2:3b-instruct")
@@ -140,13 +147,17 @@ async def check_health_status(db: Session = Depends(get_db)):
                     ):
                         health.ollama_models[required] = True
                     else:
+                        logger.warning("ollama_model_missing", model=required)
                         health.errors.append(f"Missing required model: {required}")
             else:
+                logger.warning("ollama_bad_status", status_code=response.status_code)
                 health.errors.append(f"Ollama returned status {response.status_code}")
 
     except httpx.RequestError as e:
+        logger.warning("ollama_connection_failed", error=str(e))
         health.errors.append(f"Ollama connection failed: {str(e)}")
     except Exception as e:
+        logger.warning("ollama_check_error", error=str(e))
         health.errors.append(f"Ollama check error: {str(e)}")
 
     return health
