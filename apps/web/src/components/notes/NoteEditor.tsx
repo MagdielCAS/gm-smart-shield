@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type Note, type NoteUpdate } from "../../lib/api/notes";
+import type { Note, NoteUpdate } from "../../lib/api/notes";
 import { GlassCard } from "../ui/GlassCard";
 import { TagList } from "./TagList";
 

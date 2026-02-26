@@ -1,5 +1,5 @@
 import { Tag } from "lucide-react";
-import { type NoteTag } from "../../lib/api/notes";
+import type { NoteTag } from "../../lib/api/notes";
 import { GlassCard } from "../ui/GlassCard";
 
 interface TagListProps {
