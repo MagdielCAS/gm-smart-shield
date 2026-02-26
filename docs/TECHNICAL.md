@@ -410,6 +410,8 @@ POST   /api/v1/notes                  Create a note
 GET    /api/v1/notes/{id}             Get a note
 PUT    /api/v1/notes/{id}             Update a note (refreshes deterministic tags/metadata)
 DELETE /api/v1/notes/{id}             Delete a note
+GET    /api/v1/notes/folders             List note folders/notebooks
+POST   /api/v1/notes/folders             Create a note folder/notebook
 POST   /api/v1/notes/{id}/links/suggest Suggest structured source links from knowledge chunks
 POST   /api/v1/notes/inline-suggest   Return phrase-boundary ghost-text suggestions
 POST   /api/v1/notes/transform/preview Preview context-menu rewrite/format/reference actions

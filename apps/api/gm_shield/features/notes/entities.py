@@ -32,7 +32,10 @@ class Note(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    folder_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    folder_id: Mapped[int | None] = mapped_column(
+        ForeignKey("note_folders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     tags: Mapped[list["NoteTag"]] = relationship(
         "NoteTag",
@@ -44,6 +47,21 @@ class Note(Base):
         back_populates="note",
         cascade="all, delete-orphan",
     )
+
+
+class NoteFolder(Base):
+    """Folder/notebook hierarchy for grouping GM notes."""
+
+    __tablename__ = "note_folders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    parent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("note_folders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    notes: Mapped[list["Note"]] = relationship("Note")
 
 
 class NoteTag(Base):

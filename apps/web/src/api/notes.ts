@@ -5,6 +5,17 @@ export type NoteLinkMetadata = {
 	chunk_id: string | null;
 };
 
+export type NoteFolder = {
+	id: number;
+	name: string;
+	parent_id: number | null;
+};
+
+export type NoteFolderPayload = {
+	name: string;
+	parent_id?: number | null;
+};
+
 export type Note = {
 	id: number;
 	title: string;
@@ -64,6 +75,7 @@ export type TransformPreview = {
 };
 
 type NoteListResponse = { items: Note[] };
+type NoteFolderListResponse = { items: NoteFolder[] };
 
 async function parseJsonOrThrow<T>(response: Response): Promise<T> {
 	if (!response.ok) {
@@ -133,4 +145,21 @@ export async function previewNoteTransform(
 		body: JSON.stringify(payload),
 	});
 	return parseJsonOrThrow<TransformPreview>(response);
+}
+
+export async function listNoteFolders(): Promise<NoteFolder[]> {
+	const response = await fetch("/api/v1/notes/folders");
+	const data = await parseJsonOrThrow<NoteFolderListResponse>(response);
+	return data.items;
+}
+
+export async function createNoteFolder(
+	payload: NoteFolderPayload,
+): Promise<NoteFolder> {
+	const response = await fetch("/api/v1/notes/folders", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(payload),
+	});
+	return parseJsonOrThrow<NoteFolder>(response);
 }
