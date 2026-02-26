@@ -14,6 +14,7 @@ from gm_shield.shared.database.sqlite import engine, Base
 from gm_shield.features.chat import routes as chat_routes
 from gm_shield.features.health import routes as health_routes
 from gm_shield.features.knowledge import router as knowledge_router_module
+from gm_shield.features.notes import routes as notes_routes
 from gm_shield.core.telemetry import setup_telemetry
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -55,6 +56,10 @@ _TAGS_METADATA = [
     {
         "name": "Chat",
         "description": "Query the AI agent for RAG-based answers.",
+    },
+    {
+        "name": "Notes",
+        "description": "Create, update, and organise markdown notes with tags and metadata.",
     },
 ]
 
@@ -148,4 +153,10 @@ app.include_router(
     chat_routes.router,
     prefix=f"{settings.API_V1_STR}/chat",
     tags=["Chat"],
+)
+
+app.include_router(
+    notes_routes.router,
+    prefix=f"{settings.API_V1_STR}/notes",
+    tags=["Notes"],
 )
