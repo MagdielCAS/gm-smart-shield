@@ -3,6 +3,7 @@ import { BrowserRouter, HashRouter, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { Home } from "./pages/Home";
 import KnowledgePage from "./pages/KnowledgePage";
+import NotesPage from "./pages/NotesPage";
 
 const queryClient = new QueryClient();
 const Router =
@@ -16,6 +17,7 @@ function App() {
 					<Route path="/" element={<Layout />}>
 						<Route index element={<Home />} />
 						<Route path="knowledge" element={<KnowledgePage />} />
+						<Route path="notes" element={<NotesPage />} />
 					</Route>
 				</Routes>
 			</Router>
