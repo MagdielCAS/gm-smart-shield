@@ -4,6 +4,7 @@ import {
 	MessageSquare,
 	Monitor,
 	Moon,
+	NotebookPen,
 	// Settings,
 	Shield,
 	Sun,
@@ -27,6 +28,7 @@ export function Layout() {
 		{ href: "/", label: "Dashboard", icon: Home },
 		{ href: "/knowledge", label: "Knowledge", icon: BookOpen },
 		{ href: "/chat", label: "AI Chat", icon: MessageSquare },
+		{ href: "/notes", label: "Notes", icon: NotebookPen },
 		// Deactivated for now
 		// { href: "/settings", label: "Settings", icon: Settings },
 	];
