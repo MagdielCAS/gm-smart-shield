@@ -14,9 +14,11 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from gm_shield.features.notes.entities import Note, NoteLink, NoteTag
+from gm_shield.features.notes.entities import Note, NoteFolder, NoteLink, NoteTag
 from gm_shield.features.notes.models import (
     NoteCreateRequest,
+    NoteFolderCreateRequest,
+    NoteFolderResponse,
     NoteInlineSuggestionRequest,
     NoteInlineSuggestionResponse,
     NoteLinkMetadata,
@@ -567,6 +569,34 @@ def suggest_note_links(
         note_id=note.id,
         suggestions=[NoteLinkSuggestion(**item) for item in ranked],
     )
+
+
+
+
+def _to_folder_response(folder: NoteFolder) -> NoteFolderResponse:
+    """Convert a ``NoteFolder`` ORM entity to API schema."""
+    return NoteFolderResponse(id=folder.id, name=folder.name, parent_id=folder.parent_id)
+
+
+def list_folders(db: Session) -> list[NoteFolderResponse]:
+    """Return all note folders ordered by name then ID."""
+    folders = db.query(NoteFolder).order_by(NoteFolder.name.asc(), NoteFolder.id.asc()).all()
+    return [_to_folder_response(folder) for folder in folders]
+
+
+def create_folder(db: Session, payload: NoteFolderCreateRequest) -> NoteFolderResponse:
+    """Create a note folder/notebook."""
+    if payload.parent_id is not None and db.get(NoteFolder, payload.parent_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Parent folder not found",
+        )
+
+    folder = NoteFolder(name=payload.name.strip(), parent_id=payload.parent_id)
+    db.add(folder)
+    db.commit()
+    db.refresh(folder)
+    return _to_folder_response(folder)
 
 
 def delete_note(db: Session, note_id: int) -> None:

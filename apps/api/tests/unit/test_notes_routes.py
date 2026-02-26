@@ -209,3 +209,30 @@ def test_note_editor_assist_endpoints(client):
         },
     )
     assert unsupported_response.status_code == 422
+
+
+def test_note_folders_crud_endpoints(client):
+    """Create and list folders for note organization."""
+    create_response = client.post("/api/v1/notes/folders", json={"name": "Session 0"})
+    assert create_response.status_code == 201
+    created = create_response.json()
+    assert created["name"] == "Session 0"
+    assert created["parent_id"] is None
+
+    nested_response = client.post(
+        "/api/v1/notes/folders",
+        json={"name": "NPCs", "parent_id": created["id"]},
+    )
+    assert nested_response.status_code == 201
+
+    list_response = client.get("/api/v1/notes/folders")
+    assert list_response.status_code == 200
+    names = [folder["name"] for folder in list_response.json()["items"]]
+    assert "Session 0" in names
+    assert "NPCs" in names
+
+    bad_parent_response = client.post(
+        "/api/v1/notes/folders",
+        json={"name": "Broken", "parent_id": 9999},
+    )
+    assert bad_parent_response.status_code == 404

@@ -9,6 +9,9 @@ from sqlalchemy.orm import Session
 
 from gm_shield.features.notes.models import (
     NoteCreateRequest,
+    NoteFolderCreateRequest,
+    NoteFolderListResponse,
+    NoteFolderResponse,
     NoteInlineSuggestionRequest,
     NoteInlineSuggestionResponse,
     NoteLinkSuggestionRequest,
@@ -24,6 +27,38 @@ from gm_shield.shared.database.sqlite import get_db
 
 router = APIRouter()
 
+
+
+
+@router.get(
+    "/folders",
+    response_model=NoteFolderListResponse,
+    summary="List note folders",
+    description="Returns all folders/notebooks for note organisation.",
+    responses={200: {"description": "Folders retrieved successfully."}},
+)
+def list_note_folders_endpoint(db: Session = Depends(get_db)) -> NoteFolderListResponse:
+    """Return all note folders."""
+    return NoteFolderListResponse(items=service.list_folders(db))
+
+
+@router.post(
+    "/folders",
+    response_model=NoteFolderResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create note folder",
+    description="Creates a folder/notebook for organizing notes.",
+    responses={
+        201: {"description": "Folder created successfully."},
+        404: {"description": "Parent folder not found."},
+    },
+)
+def create_note_folder_endpoint(
+    payload: NoteFolderCreateRequest,
+    db: Session = Depends(get_db),
+) -> NoteFolderResponse:
+    """Create and return a note folder."""
+    return service.create_folder(db, payload)
 
 @router.get(
     "",

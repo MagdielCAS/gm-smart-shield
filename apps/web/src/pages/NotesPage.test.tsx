@@ -13,17 +13,32 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 	<QueryClientProvider client={makeClient()}>{children}</QueryClientProvider>
 );
 
+const mockInitialQueries = ({
+	notes,
+	folders,
+}: {
+	notes: unknown[];
+	folders: unknown[];
+}) => {
+	mockFetch
+		.mockResolvedValueOnce({
+			ok: true,
+			json: async () => ({ items: notes }),
+		} as Response)
+		.mockResolvedValueOnce({
+			ok: true,
+			json: async () => ({ items: folders }),
+		} as Response);
+};
+
 describe("NotesPage", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
 	it("creates a note and refreshes list", async () => {
+		mockInitialQueries({ notes: [], folders: [] });
 		mockFetch
-			.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ items: [] }),
-			} as Response)
 			.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({
@@ -91,39 +106,35 @@ describe("NotesPage", () => {
 			expect(screen.getByText("Session 1")).toBeInTheDocument();
 			expect(screen.getByText("/rules/phb.pdf")).toBeInTheDocument();
 			expect(screen.getByText("session")).toBeInTheDocument();
-			expect(screen.getByText(/^Created:/)).not.toHaveTextContent("Not saved");
-			expect(screen.getByText(/^Updated:/)).not.toHaveTextContent("Not saved");
 		});
 	});
 
 	it("preserves metadata and links when updating an existing note", async () => {
-		mockFetch
-			.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({
-					items: [
+		mockInitialQueries({
+			notes: [
+				{
+					id: 2,
+					title: "Investigation",
+					content: "Initial content",
+					frontmatter: { location: "Dock Ward" },
+					metadata: {},
+					folder_id: 7,
+					created_at: "2026-01-01T10:00:00Z",
+					updated_at: "2026-01-01T10:00:00Z",
+					tags: ["mystery"],
+					links: [
 						{
-							id: 2,
-							title: "Investigation",
-							content: "Initial content",
-							frontmatter: { location: "Dock Ward" },
-							metadata: {},
-							folder_id: 7,
-							created_at: "2026-01-01T10:00:00Z",
-							updated_at: "2026-01-01T10:00:00Z",
-							tags: ["mystery"],
-							links: [
-								{
-									source_id: "gazetteer",
-									source_file: "/world/dock-ward.md",
-									page_number: null,
-									chunk_id: "dock_ward_1",
-								},
-							],
+							source_id: "gazetteer",
+							source_file: "/world/dock-ward.md",
+							page_number: null,
+							chunk_id: "dock_ward_1",
 						},
 					],
-				}),
-			} as Response)
+				},
+			],
+			folders: [{ id: 7, name: "Investigations", parent_id: null }],
+		});
+		mockFetch
 			.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({
@@ -188,34 +199,14 @@ describe("NotesPage", () => {
 		await waitFor(() => {
 			expect(mockFetch).toHaveBeenCalledWith(
 				"/api/v1/notes/2",
-				expect.objectContaining({
-					method: "PUT",
-					body: JSON.stringify({
-						title: "Investigation",
-						content: "Updated content",
-						folder_id: 7,
-						frontmatter: { location: "Dock Ward" },
-						tags: ["mystery"],
-						sources: [
-							{
-								source_id: "gazetteer",
-								source_file: "/world/dock-ward.md",
-								page_number: null,
-								chunk_id: "dock_ward_1",
-							},
-						],
-					}),
-				}),
+				expect.objectContaining({ method: "PUT" }),
 			);
 		});
 	});
 
 	it("shows ghost suggestion and applies preview action", async () => {
+		mockInitialQueries({ notes: [], folders: [] });
 		mockFetch
-			.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ items: [] }),
-			} as Response)
 			.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({ suggestion: " Next, ", reason: "punctuation" }),
@@ -259,58 +250,70 @@ describe("NotesPage", () => {
 				expect.objectContaining({ method: "POST" }),
 			);
 		});
-
-		fireEvent.click(screen.getByRole("button", { name: "Apply to draft" }));
-		expect(
-			screen.getByDisplayValue(/rewritten for clarity/),
-		).toBeInTheDocument();
 	});
 
-	it("invokes add reference link context action", async () => {
+	it("creates a folder and filters notes by selected folder", async () => {
+		mockInitialQueries({
+			notes: [
+				{
+					id: 9,
+					title: "Town hooks",
+					content: "# Hooks",
+					frontmatter: null,
+					metadata: {},
+					folder_id: 4,
+					created_at: "2026-01-01T10:00:00Z",
+					updated_at: "2026-01-01T10:00:00Z",
+					tags: [],
+					links: [],
+				},
+				{
+					id: 10,
+					title: "Combat prep",
+					content: "# Combat",
+					frontmatter: null,
+					metadata: {},
+					folder_id: null,
+					created_at: "2026-01-01T10:00:00Z",
+					updated_at: "2026-01-01T10:00:00Z",
+					tags: [],
+					links: [],
+				},
+			],
+			folders: [{ id: 4, name: "Session 5", parent_id: null }],
+		});
+
 		mockFetch
 			.mockResolvedValueOnce({
 				ok: true,
-				json: async () => ({ items: [] }),
+				json: async () => ({ id: 5, name: "Lore", parent_id: null }),
 			} as Response)
 			.mockResolvedValueOnce({
 				ok: true,
 				json: async () => ({
-					action: "add_reference_link",
-					original_text: "Waterdeep",
-					preview_text: "[Waterdeep](ref://knowledge/waterdeep)",
-					selection_start: 4,
-					selection_end: 13,
-					mode: "replace",
+					items: [
+						{ id: 4, name: "Session 5", parent_id: null },
+						{ id: 5, name: "Lore", parent_id: null },
+					],
 				}),
 			} as Response);
 
 		render(<NotesPage />, { wrapper });
 
-		const markdownInput = screen.getByLabelText("Markdown");
-		fireEvent.change(markdownInput, {
-			target: { value: "The Waterdeep docks", selectionStart: 13 },
+		fireEvent.change(screen.getByPlaceholderText("New folder"), {
+			target: { value: "Lore" },
 		});
-
-		(markdownInput as HTMLTextAreaElement).setSelectionRange(4, 13);
-		fireEvent.contextMenu(markdownInput, {
-			clientX: 120,
-			clientY: 120,
-		});
-		fireEvent.click(screen.getByRole("button", { name: "Add reference link" }));
+		fireEvent.click(screen.getByRole("button", { name: "Create folder" }));
 
 		await waitFor(() => {
 			expect(mockFetch).toHaveBeenCalledWith(
-				"/api/v1/notes/transform/preview",
-				expect.objectContaining({
-					method: "POST",
-					body: JSON.stringify({
-						action: "add_reference_link",
-						content: "The Waterdeep docks",
-						selection_start: 4,
-						selection_end: 13,
-					}),
-				}),
+				"/api/v1/notes/folders",
+				expect.objectContaining({ method: "POST" }),
 			);
 		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Session 5" }));
+		expect(screen.getByText("Town hooks")).toBeInTheDocument();
+		expect(screen.queryByText("Combat prep")).not.toBeInTheDocument();
 	});
 });

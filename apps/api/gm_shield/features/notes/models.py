@@ -248,3 +248,39 @@ class NoteTransformResponse(BaseModel):
         default="replace",
         description="How to apply preview: replace or insert.",
     )
+
+
+class NoteFolderCreateRequest(BaseModel):
+    """Payload for creating a note folder/notebook."""
+
+    name: str = Field(
+        ...,
+        min_length=1,
+        description="Folder display name.",
+        examples=["Session Notes"],
+    )
+    parent_id: int | None = Field(
+        default=None,
+        description="Optional parent folder ID for nested structures.",
+        examples=[1],
+    )
+
+
+class NoteFolderResponse(BaseModel):
+    """Response schema describing a note folder/notebook."""
+
+    id: int = Field(..., description="Unique folder identifier.", examples=[3])
+    name: str = Field(..., description="Folder display name.")
+    parent_id: int | None = Field(
+        default=None,
+        description="Optional parent folder ID.",
+    )
+
+
+class NoteFolderListResponse(BaseModel):
+    """Response payload listing folders."""
+
+    items: list[NoteFolderResponse] = Field(
+        default_factory=list,
+        description="All available note folders.",
+    )

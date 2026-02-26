@@ -1,16 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, NotebookPen, Save, Sparkles, Tag } from "lucide-react";
 import {
-	Fragment,
+	FolderPlus,
+	Loader2,
+	NotebookPen,
+	Save,
+	Sparkles,
+	Tag,
+} from "lucide-react";
+import {
 	type KeyboardEvent,
 	type MouseEvent,
-	type ReactNode,
+	type ReactElement,
 	useMemo,
 	useRef,
 	useState,
 } from "react";
 import {
 	createNote,
+	createNoteFolder,
+	listNoteFolders,
 	listNotes,
 	type Note,
 	previewNoteTransform,
@@ -23,6 +31,7 @@ import { GlassButton } from "@/components/ui/GlassButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 
 const NOTES_QUERY_KEY = ["notes"] as const;
+const FOLDERS_QUERY_KEY = ["note-folders"] as const;
 const PHRASE_BOUNDARY_REGEX = /[.!?;:]$/;
 
 const CONTEXT_ACTIONS: Array<{ label: string; action: TransformAction }> = [
@@ -34,75 +43,182 @@ const CONTEXT_ACTIONS: Array<{ label: string; action: TransformAction }> = [
 	{ label: "Search reference link", action: "search_reference_link" },
 ];
 
-function parseInlineMarkdown(text: string): ReactNode[] {
+function parseInlineMarkdown(text: string) {
 	const tokens = text
-		.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g)
+		.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g)
 		.filter(Boolean);
 	let cursor = 0;
 
 	return tokens.map((token) => {
-		const tokenStart = cursor;
+		const start = cursor;
 		cursor += token.length;
+		const key = `${token}-${start}`;
 		if (token.startsWith("**") && token.endsWith("**")) {
-			return (
-				<strong key={`${token}-${tokenStart}`}>{token.slice(2, -2)}</strong>
-			);
+			return <strong key={key}>{token.slice(2, -2)}</strong>;
 		}
 		if (token.startsWith("*") && token.endsWith("*")) {
-			return <em key={`${token}-${tokenStart}`}>{token.slice(1, -1)}</em>;
+			return <em key={key}>{token.slice(1, -1)}</em>;
 		}
 		if (token.startsWith("`") && token.endsWith("`")) {
 			return (
 				<code
-					key={`${token}-${tokenStart}`}
+					key={key}
 					className="rounded bg-black/10 px-1 py-0.5 dark:bg-white/10"
 				>
 					{token.slice(1, -1)}
 				</code>
 			);
 		}
-		return <Fragment key={`${token}-${tokenStart}`}>{token}</Fragment>;
+		if (token.startsWith("[") && token.includes("](")) {
+			const match = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+			if (match) {
+				return (
+					<a
+						key={key}
+						href={match[2]}
+						className="text-primary underline"
+						target="_blank"
+						rel="noreferrer"
+					>
+						{match[1]}
+					</a>
+				);
+			}
+		}
+		return <span key={key}>{token}</span>;
 	});
 }
 
 function renderMarkdown(value: string) {
 	const lines = value.split("\n");
-	let offset = 0;
+	const blocks: ReactElement[] = [];
+	let i = 0;
+	let inCodeBlock = false;
+	let codeLines: string[] = [];
 
-	return lines.map((line) => {
-		const lineOffset = offset;
-		offset += line.length + 1;
-		if (line.startsWith("### ")) {
-			return (
-				<h3 key={`${line}-${lineOffset}`} className="text-lg font-semibold">
-					{parseInlineMarkdown(line.slice(4))}
-				</h3>
-			);
+	while (i < lines.length) {
+		const line = lines[i];
+		if (line.startsWith("```")) {
+			if (!inCodeBlock) {
+				inCodeBlock = true;
+				codeLines = [];
+			} else {
+				blocks.push(
+					<pre
+						key={`code-${i}`}
+						className="overflow-x-auto rounded bg-black/80 p-3 text-xs text-white"
+					>
+						<code>{codeLines.join("\n")}</code>
+					</pre>,
+				);
+				inCodeBlock = false;
+			}
+			i += 1;
+			continue;
 		}
-		if (line.startsWith("## ")) {
-			return (
-				<h2 key={`${line}-${lineOffset}`} className="text-xl font-semibold">
-					{parseInlineMarkdown(line.slice(3))}
-				</h2>
-			);
+		if (inCodeBlock) {
+			codeLines.push(line);
+			i += 1;
+			continue;
 		}
-		if (line.startsWith("# ")) {
-			return (
-				<h1 key={`${line}-${lineOffset}`} className="text-2xl font-semibold">
+
+		if (line.startsWith("|")) {
+			const row = line
+				.split("|")
+				.map((cell) => cell.trim())
+				.filter(Boolean);
+			if (row.length) {
+				blocks.push(
+					<div key={`table-${i}`} className="overflow-x-auto">
+						<table className="w-full border-collapse text-xs">
+							<tbody>
+								<tr>
+									{row.map((cell) => (
+										<td
+											key={`${cell}-${i}`}
+											className="border border-white/30 px-2 py-1"
+										>
+											{parseInlineMarkdown(cell)}
+										</td>
+									))}
+								</tr>
+							</tbody>
+						</table>
+					</div>,
+				);
+			}
+			i += 1;
+			continue;
+		}
+
+		if (line.startsWith("- ") || /^\d+\.\s/.test(line)) {
+			const items: string[] = [];
+			const ordered = /^\d+\.\s/.test(line);
+			while (
+				i < lines.length &&
+				(ordered ? /^\d+\.\s/.test(lines[i]) : lines[i].startsWith("- "))
+			) {
+				items.push(lines[i].replace(ordered ? /^\d+\.\s/ : /^-\s/, ""));
+				i += 1;
+			}
+			const ListTag = ordered ? "ol" : "ul";
+			blocks.push(
+				<ListTag
+					key={`list-${i}`}
+					className={ordered ? "list-decimal pl-6" : "list-disc pl-6"}
+				>
+					{items.map((item) => (
+						<li key={`${item}-${i}`}>{parseInlineMarkdown(item)}</li>
+					))}
+				</ListTag>,
+			);
+			continue;
+		}
+
+		if (line.startsWith("> ")) {
+			blocks.push(
+				<blockquote
+					key={`quote-${i}`}
+					className="border-l-2 border-primary/40 pl-3 italic"
+				>
 					{parseInlineMarkdown(line.slice(2))}
-				</h1>
+				</blockquote>,
 			);
-		}
-		if (!line.trim()) {
-			return <br key={`break-${lineOffset}`} />;
+			i += 1;
+			continue;
 		}
 
-		return (
-			<p key={`${line}-${lineOffset}`} className="leading-relaxed">
-				{parseInlineMarkdown(line)}
-			</p>
-		);
-	});
+		if (line.startsWith("### ")) {
+			blocks.push(
+				<h3 key={`h3-${i}`} className="text-lg font-semibold">
+					{parseInlineMarkdown(line.slice(4))}
+				</h3>,
+			);
+		} else if (line.startsWith("## ")) {
+			blocks.push(
+				<h2 key={`h2-${i}`} className="text-xl font-semibold">
+					{parseInlineMarkdown(line.slice(3))}
+				</h2>,
+			);
+		} else if (line.startsWith("# ")) {
+			blocks.push(
+				<h1 key={`h1-${i}`} className="text-2xl font-semibold">
+					{parseInlineMarkdown(line.slice(2))}
+				</h1>,
+			);
+		} else if (!line.trim()) {
+			blocks.push(<br key={`br-${i}`} />);
+		} else {
+			blocks.push(
+				<p key={`p-${i}`} className="leading-relaxed">
+					{parseInlineMarkdown(line)}
+				</p>,
+			);
+		}
+		i += 1;
+	}
+
+	return blocks;
 }
 
 function formatDate(value: string) {
@@ -125,6 +241,8 @@ export default function NotesPage() {
 	const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
 	const [draftTitle, setDraftTitle] = useState("Untitled note");
 	const [draftContent, setDraftContent] = useState("# Session notes\n");
+	const [newFolderName, setNewFolderName] = useState("");
+	const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const [ghostText, setGhostText] = useState("");
 	const [preview, setPreview] = useState<TransformPreview | null>(null);
@@ -141,12 +259,17 @@ export default function NotesPage() {
 		queryFn: listNotes,
 	});
 
+	const foldersQuery = useQuery({
+		queryKey: FOLDERS_QUERY_KEY,
+		queryFn: listNoteFolders,
+	});
+
 	const saveMutation = useMutation({
 		mutationFn: async () => {
 			const payload = {
 				title: draftTitle.trim(),
 				content: draftContent,
-				folder_id: selectedNote?.folder_id ?? null,
+				folder_id: selectedFolderId,
 				frontmatter: selectedNote?.frontmatter ?? null,
 				tags: selectedNote?.tags ?? [],
 				sources: selectedNote?.links ?? [],
@@ -159,10 +282,23 @@ export default function NotesPage() {
 		onSuccess: async (savedNote) => {
 			setSaveError(null);
 			setSelectedNoteId(savedNote.id);
+			setSelectedFolderId(savedNote.folder_id ?? null);
 			await queryClient.invalidateQueries({ queryKey: NOTES_QUERY_KEY });
 		},
 		onError: (error: Error) => {
 			setSaveError(error.message);
+		},
+	});
+
+	const folderMutation = useMutation({
+		mutationFn: async () =>
+			createNoteFolder({
+				name: newFolderName.trim(),
+			}),
+		onSuccess: async (folder) => {
+			setNewFolderName("");
+			setSelectedFolderId(folder.id);
+			await queryClient.invalidateQueries({ queryKey: FOLDERS_QUERY_KEY });
 		},
 	});
 
@@ -189,6 +325,7 @@ export default function NotesPage() {
 	});
 
 	const notes = notesQuery.data ?? [];
+	const folders = foldersQuery.data ?? [];
 	const selectedNote = useMemo(
 		() => notes.find((note) => note.id === selectedNoteId) ?? null,
 		[notes, selectedNoteId],
@@ -220,37 +357,41 @@ export default function NotesPage() {
 		}
 		event.preventDefault();
 		const target = event.currentTarget;
-		const nextValue = `${draftContent.slice(0, target.selectionStart)}${ghostText}${draftContent.slice(target.selectionEnd)}`;
-		setDraftContent(nextValue);
+		const start = target.selectionStart;
+		const end = target.selectionEnd;
+		const next = `${draftContent.slice(0, start)}${ghostText}${draftContent.slice(end)}`;
+		setDraftContent(next);
 		setGhostText("");
-	};
-
-	const selectNote = (note: Note) => {
-		setSelectedNoteId(note.id);
-		setDraftTitle(note.title);
-		setDraftContent(note.content);
-		setSaveError(null);
-		setGhostText("");
-		setPreview(null);
 	};
 
 	const createNewDraft = () => {
 		setSelectedNoteId(null);
 		setDraftTitle("Untitled note");
 		setDraftContent("# Session notes\n");
+		setSelectedFolderId(null);
 		setSaveError(null);
-		setGhostText("");
 		setPreview(null);
+		setPreviewError(null);
+	};
+
+	const selectNote = (note: Note) => {
+		setSelectedNoteId(note.id);
+		setDraftTitle(note.title);
+		setDraftContent(note.content);
+		setSelectedFolderId(note.folder_id ?? null);
+		setSaveError(null);
+		setPreview(null);
+		setPreviewError(null);
 	};
 
 	const openContextMenu = (event: MouseEvent<HTMLTextAreaElement>) => {
 		event.preventDefault();
-		const textarea = event.currentTarget;
+		const target = event.currentTarget;
 		setMenuState({
 			x: event.clientX,
 			y: event.clientY,
-			start: textarea.selectionStart,
-			end: textarea.selectionEnd,
+			start: target.selectionStart,
+			end: target.selectionEnd,
 		});
 	};
 
@@ -267,12 +408,10 @@ export default function NotesPage() {
 	};
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center justify-between gap-4">
+		<div className="space-y-4">
+			<div className="flex items-center justify-between gap-3">
 				<div>
-					<h1 className="text-2xl font-semibold tracking-tight">
-						Campaign Notes
-					</h1>
+					<h1 className="text-2xl font-semibold">Notes Workspace</h1>
 					<p className="text-sm text-muted-foreground">
 						Create and organize markdown notes with linked source context.
 					</p>
@@ -284,37 +423,89 @@ export default function NotesPage() {
 			</div>
 
 			<div className="grid gap-4 lg:grid-cols-[280px_1fr_1fr]">
-				<GlassCard className="p-4">
-					<h2 className="mb-3 text-sm font-semibold text-muted-foreground">
-						Notes
-					</h2>
-					{notesQuery.isLoading ? (
-						<div className="flex items-center gap-2 text-sm text-muted-foreground">
-							<Loader2 className="h-4 w-4 animate-spin" /> Loading notes…
+				<GlassCard className="space-y-4 p-4">
+					<div>
+						<h2 className="mb-3 text-sm font-semibold text-muted-foreground">
+							Folders
+						</h2>
+						<div className="flex gap-2">
+							<input
+								value={newFolderName}
+								onChange={(event) => setNewFolderName(event.target.value)}
+								placeholder="New folder"
+								className="w-full rounded-lg border border-white/30 bg-white/70 px-2 py-1.5 text-xs outline-none ring-primary/40 focus:ring dark:border-white/10 dark:bg-white/10"
+							/>
+							<GlassButton
+								aria-label="Create folder"
+								type="button"
+								onClick={() => folderMutation.mutate()}
+								disabled={!newFolderName.trim() || folderMutation.isPending}
+								variant="secondary"
+							>
+								<FolderPlus className="h-4 w-4" />
+							</GlassButton>
 						</div>
-					) : (
-						<ul className="space-y-2">
-							{notes.map((note) => (
-								<li key={note.id}>
-									<button
-										type="button"
-										onClick={() => selectNote(note)}
-										className="w-full rounded-lg border border-white/30 bg-white/50 p-2 text-left hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
-									>
-										<p className="truncate text-sm font-medium">{note.title}</p>
-										<p className="text-xs text-muted-foreground">
-											Updated {formatDate(note.updated_at)}
-										</p>
-									</button>
-								</li>
+						<div className="mt-2 space-y-1">
+							<button
+								type="button"
+								onClick={() => setSelectedFolderId(null)}
+								className={`w-full rounded px-2 py-1 text-left text-xs ${selectedFolderId === null ? "bg-white/70 dark:bg-white/20" : "hover:bg-white/50 dark:hover:bg-white/10"}`}
+							>
+								All folders
+							</button>
+							{folders.map((folder) => (
+								<button
+									key={folder.id}
+									type="button"
+									onClick={() => setSelectedFolderId(folder.id)}
+									className={`w-full rounded px-2 py-1 text-left text-xs ${selectedFolderId === folder.id ? "bg-white/70 dark:bg-white/20" : "hover:bg-white/50 dark:hover:bg-white/10"}`}
+								>
+									{folder.name}
+								</button>
 							))}
-							{notes.length === 0 ? (
-								<li className="rounded-lg border border-dashed border-white/30 p-3 text-sm text-muted-foreground">
-									No notes yet.
-								</li>
-							) : null}
-						</ul>
-					)}
+						</div>
+					</div>
+
+					<div>
+						<h2 className="mb-3 text-sm font-semibold text-muted-foreground">
+							Notes
+						</h2>
+						{notesQuery.isLoading ? (
+							<div className="flex items-center gap-2 text-sm text-muted-foreground">
+								<Loader2 className="h-4 w-4 animate-spin" /> Loading notes…
+							</div>
+						) : (
+							<ul className="space-y-2">
+								{notes
+									.filter(
+										(note) =>
+											selectedFolderId === null ||
+											note.folder_id === selectedFolderId,
+									)
+									.map((note) => (
+										<li key={note.id}>
+											<button
+												type="button"
+												onClick={() => selectNote(note)}
+												className="w-full rounded-lg border border-white/30 bg-white/50 p-2 text-left hover:bg-white/70 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+											>
+												<p className="truncate text-sm font-medium">
+													{note.title}
+												</p>
+												<p className="text-xs text-muted-foreground">
+													Updated {formatDate(note.updated_at)}
+												</p>
+											</button>
+										</li>
+									))}
+								{notes.length === 0 ? (
+									<li className="rounded-lg border border-dashed border-white/30 p-3 text-sm text-muted-foreground">
+										No notes yet.
+									</li>
+								) : null}
+							</ul>
+						)}
+					</div>
 				</GlassCard>
 
 				<GlassCard className="relative space-y-3 p-4">
@@ -331,6 +522,31 @@ export default function NotesPage() {
 							onChange={(event) => setDraftTitle(event.target.value)}
 							className="w-full rounded-lg border border-white/30 bg-white/70 px-3 py-2 text-sm outline-none ring-primary/40 focus:ring dark:border-white/10 dark:bg-white/10"
 						/>
+					</div>
+					<div className="space-y-1">
+						<label
+							htmlFor="note-folder"
+							className="text-xs font-medium text-muted-foreground"
+						>
+							Folder
+						</label>
+						<select
+							id="note-folder"
+							value={selectedFolderId ?? ""}
+							onChange={(event) =>
+								setSelectedFolderId(
+									event.target.value ? Number(event.target.value) : null,
+								)
+							}
+							className="w-full rounded-lg border border-white/30 bg-white/70 px-3 py-2 text-sm outline-none ring-primary/40 focus:ring dark:border-white/10 dark:bg-white/10"
+						>
+							<option value="">No folder</option>
+							{folders.map((folder) => (
+								<option key={folder.id} value={folder.id}>
+									{folder.name}
+								</option>
+							))}
+						</select>
 					</div>
 					<div className="space-y-1">
 						<label
