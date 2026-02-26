@@ -112,8 +112,12 @@ class NoteResponse(BaseModel):
         default=None,
         description="Optional folder identifier linked to the note.",
     )
-    created_at: datetime = Field(..., description="UTC timestamp when the note was created.")
-    updated_at: datetime = Field(..., description="UTC timestamp when the note was last updated.")
+    created_at: datetime = Field(
+        ..., description="UTC timestamp when the note was created."
+    )
+    updated_at: datetime = Field(
+        ..., description="UTC timestamp when the note was last updated."
+    )
     tags: list[str] = Field(
         default_factory=list,
         description="All tags associated with the note.",
@@ -127,45 +131,71 @@ class NoteResponse(BaseModel):
 class NoteListResponse(BaseModel):
     """Response schema for listing notes."""
 
-    items: list[NoteResponse] = Field(default_factory=list, description="Collection of notes.")
+    items: list[NoteResponse] = Field(
+        default_factory=list, description="Collection of notes."
+    )
 
 
 class NoteLinkSuggestionRequest(BaseModel):
     """Payload requesting link suggestions for a note."""
 
-    limit: int = Field(default=5, ge=1, le=20, description="Maximum number of suggested links.")
+    limit: int = Field(
+        default=5, ge=1, le=20, description="Maximum number of suggested links."
+    )
 
 
 class NoteLinkSuggestion(BaseModel):
     """A suggested link candidate derived from knowledge chunks."""
 
-    source_id: str | None = Field(default=None, description="Best-effort source identifier.")
-    source_file: str | None = Field(default=None, description="Best-effort source file path.")
-    page_number: int | None = Field(default=None, description="Best-effort source page number.")
-    chunk_id: str | None = Field(default=None, description="Suggested Chroma chunk identifier.")
-    snippet: str = Field(..., description="Chunk text snippet used for suggestion context.")
-    similarity_score: float = Field(..., description="Semantic similarity score in range [0,1].")
-    keyword_overlap: int = Field(..., description="Count of overlapping keywords with note content.")
+    source_id: str | None = Field(
+        default=None, description="Best-effort source identifier."
+    )
+    source_file: str | None = Field(
+        default=None, description="Best-effort source file path."
+    )
+    page_number: int | None = Field(
+        default=None, description="Best-effort source page number."
+    )
+    chunk_id: str | None = Field(
+        default=None, description="Suggested Chroma chunk identifier."
+    )
+    snippet: str = Field(
+        ..., description="Chunk text snippet used for suggestion context."
+    )
+    similarity_score: float = Field(
+        ..., description="Semantic similarity score in range [0,1]."
+    )
+    keyword_overlap: int = Field(
+        ..., description="Count of overlapping keywords with note content."
+    )
 
 
 class NoteLinkSuggestionResponse(BaseModel):
     """Response payload containing suggested links for a note."""
 
-    note_id: int = Field(..., description="Note identifier used to generate suggestions.")
-    suggestions: list[NoteLinkSuggestion] = Field(default_factory=list, description="Suggested source links.")
+    note_id: int = Field(
+        ..., description="Note identifier used to generate suggestions."
+    )
+    suggestions: list[NoteLinkSuggestion] = Field(
+        default_factory=list, description="Suggested source links."
+    )
 
 
 class NoteInlineSuggestionRequest(BaseModel):
     """Payload requesting ghost-text suggestions while editing a note."""
 
     content: str = Field(..., description="Current full editor content.")
-    cursor_index: int = Field(..., ge=0, description="Current cursor location within content.")
+    cursor_index: int = Field(
+        ..., ge=0, description="Current cursor location within content."
+    )
 
 
 class NoteInlineSuggestionResponse(BaseModel):
     """Response payload for inline ghost-text suggestions."""
 
-    suggestion: str = Field(default="", description="Suggested text to insert at the cursor.")
+    suggestion: str = Field(
+        default="", description="Suggested text to insert at the cursor."
+    )
     reason: str = Field(
         default="none",
         description="Reason category for debugging: punctuation, newline, idle, or none.",
@@ -188,18 +218,32 @@ class NoteTransformRequest(BaseModel):
 
     action: str = Field(..., description="Requested transformation action.")
     content: str = Field(..., description="Current full editor content.")
-    selection_start: int = Field(..., ge=0, description="Selection start index in the editor content.")
-    selection_end: int = Field(..., ge=0, description="Selection end index in the editor content.")
+    selection_start: int = Field(
+        ..., ge=0, description="Selection start index in the editor content."
+    )
+    selection_end: int = Field(
+        ..., ge=0, description="Selection end index in the editor content."
+    )
 
 
 class NoteTransformResponse(BaseModel):
     """Preview payload for a context-action transformation."""
 
-    action: str = Field(..., description="Transformation action that produced this preview.")
-    original_text: str = Field(..., description="Original selected text before transformation.")
-    preview_text: str = Field(..., description="Suggested replacement or insertion text.")
-    selection_start: int = Field(..., ge=0, description="Selection start index used by the action.")
-    selection_end: int = Field(..., ge=0, description="Selection end index used by the action.")
+    action: str = Field(
+        ..., description="Transformation action that produced this preview."
+    )
+    original_text: str = Field(
+        ..., description="Original selected text before transformation."
+    )
+    preview_text: str = Field(
+        ..., description="Suggested replacement or insertion text."
+    )
+    selection_start: int = Field(
+        ..., ge=0, description="Selection start index used by the action."
+    )
+    selection_end: int = Field(
+        ..., ge=0, description="Selection end index used by the action."
+    )
     mode: str = Field(
         default="replace",
         description="How to apply preview: replace or insert.",

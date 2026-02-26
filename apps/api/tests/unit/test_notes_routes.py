@@ -13,6 +13,7 @@ def test_notes_crud_flow(client):
         "frontmatter": {"mood": "mysterious"},
         "sources": [
             {
+                "tag": "monster",
                 "source_id": "monster-manual",
                 "source_file": "/data/monster-manual.pdf",
                 "page_number": 42,
@@ -27,7 +28,9 @@ def test_notes_crud_flow(client):
     note_id = created["id"]
 
     assert created["title"] == create_payload["title"]
-    assert created["content"] == "# Recap\nThe heroes met in a tavern with #Harper allies."
+    assert (
+        created["content"] == "# Recap\nThe heroes met in a tavern with #Harper allies."
+    )
     assert "session" in created["tags"]
     assert "recap" in created["tags"]
     assert "harper" in created["tags"]
@@ -60,6 +63,7 @@ def test_notes_crud_flow(client):
         "frontmatter": {"weather": "rain"},
         "sources": [
             {
+                "tag": "rules",
                 "source_id": "dm-guide",
                 "source_file": "/data/dm-guide.pdf",
                 "page_number": 99,
@@ -88,7 +92,9 @@ def test_notes_crud_flow(client):
         "tags": ["final"],
         "sources": [],
     }
-    second_update_response = client.put(f"/api/v1/notes/{note_id}", json=second_update_payload)
+    second_update_response = client.put(
+        f"/api/v1/notes/{note_id}", json=second_update_payload
+    )
     assert second_update_response.status_code == 200
     second_updated = second_update_response.json()
     assert "final" in second_updated["tags"]
@@ -110,12 +116,20 @@ def test_note_link_suggestions_endpoint(client, monkeypatch):
         def query(self, query_texts, n_results, include):
             return {
                 "ids": [["chunk-0", "chunk-1", "chunk-2"]],
-                "documents": [["Waterdeep smuggling ring exact lead", "Waterdeep harbor smuggling ring", "Neverwinter politics"]],
-                "metadatas": [[
-                    {"source": "/data/lore.pdf", "page_number": 1},
-                    {"source": "/data/lore.pdf", "page_number": 5},
-                    {"source": "/data/lore.pdf", "page_number": 10},
-                ]],
+                "documents": [
+                    [
+                        "Waterdeep smuggling ring exact lead",
+                        "Waterdeep harbor smuggling ring",
+                        "Neverwinter politics",
+                    ]
+                ],
+                "metadatas": [
+                    [
+                        {"source": "/data/lore.pdf", "page_number": 1},
+                        {"source": "/data/lore.pdf", "page_number": 5},
+                        {"source": "/data/lore.pdf", "page_number": 10},
+                    ]
+                ],
                 "distances": [[0.0, 0.1, 0.6]],
             }
 
@@ -131,7 +145,9 @@ def test_note_link_suggestions_endpoint(client, monkeypatch):
             assert name == "knowledge_base"
             return MockCollection()
 
-    monkeypatch.setattr("gm_shield.features.notes.service.get_chroma_client", lambda: MockClient())
+    monkeypatch.setattr(
+        "gm_shield.features.notes.service.get_chroma_client", lambda: MockClient()
+    )
 
     create_response = client.post(
         "/api/v1/notes",
@@ -145,7 +161,9 @@ def test_note_link_suggestions_endpoint(client, monkeypatch):
     assert create_response.status_code == 201
     note_id = create_response.json()["id"]
 
-    suggest_response = client.post(f"/api/v1/notes/{note_id}/links/suggest", json={"limit": 2})
+    suggest_response = client.post(
+        f"/api/v1/notes/{note_id}/links/suggest", json={"limit": 2}
+    )
     assert suggest_response.status_code == 200
     payload = suggest_response.json()
     assert payload["note_id"] == note_id
