@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from gm_shield.features.notes.models import (
     NoteCreateRequest,
+    NoteLinkSuggestionRequest,
+    NoteLinkSuggestionResponse,
     NoteListResponse,
     NoteResponse,
     NoteUpdateRequest,
@@ -83,3 +85,19 @@ def delete_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> Respons
     """Delete a note and return an empty response."""
     service.delete_note(db, note_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{note_id}/links/suggest",
+    response_model=NoteLinkSuggestionResponse,
+    summary="Suggest note links",
+    description="Suggests knowledge-source links for a note using semantic and keyword matching.",
+    responses={200: {"description": "Link suggestions generated."}, 404: {"description": "Note not found."}},
+)
+def suggest_note_links_endpoint(
+    note_id: int,
+    payload: NoteLinkSuggestionRequest,
+    db: Session = Depends(get_db),
+) -> NoteLinkSuggestionResponse:
+    """Generate source-link suggestions for a note."""
+    return service.suggest_note_links(db, note_id, payload)

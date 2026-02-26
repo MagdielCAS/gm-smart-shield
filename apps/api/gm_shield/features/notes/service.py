@@ -1,8 +1,8 @@
 """
 Business logic for the Notes feature slice.
 
-Provides CRUD operations for note records and related tags while keeping route
-handlers thin and focused on HTTP concerns.
+Provides CRUD operations for note records, source links, and link-suggestion
+flows while keeping route handlers thin and focused on HTTP concerns.
 """
 
 import json
@@ -14,13 +14,17 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from gm_shield.features.notes.entities import Note, NoteTag
+from gm_shield.features.notes.entities import Note, NoteLink, NoteTag
 from gm_shield.features.notes.models import (
     NoteCreateRequest,
     NoteLinkMetadata,
+    NoteLinkSuggestion,
+    NoteLinkSuggestionRequest,
+    NoteLinkSuggestionResponse,
     NoteResponse,
     NoteUpdateRequest,
 )
+from gm_shield.shared.database.chroma import get_chroma_client
 
 STOPWORDS = {
     "a",
@@ -145,6 +149,15 @@ def _run_note_enrichment(content: str, explicit_tags: list[str]) -> tuple[list[s
     return all_tags, metadata, markdown_body
 
 
+def _keywords(text: str) -> set[str]:
+    """Extract normalized non-stopword keywords from free text."""
+    return {
+        token
+        for token in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", text.lower())
+        if token not in STOPWORDS
+    }
+
+
 def _to_response(note: Note) -> NoteResponse:
     """Convert a ``Note`` ORM entity to an API response schema."""
     parsed_frontmatter = json.loads(note.frontmatter_json) if note.frontmatter_json else None
@@ -160,23 +173,33 @@ def _to_response(note: Note) -> NoteResponse:
         updated_at=note.updated_at,
         tags=[tag.tag for tag in note.tags],
         links=[
-            NoteLinkMetadata(tag=tag.tag, source_id=tag.source_id, page_number=tag.page_number)
-            for tag in note.tags
+            NoteLinkMetadata(
+                source_id=link.source_id,
+                source_file=link.source_file,
+                page_number=link.page_number,
+                chunk_id=link.chunk_id,
+            )
+            for link in note.links
         ],
     )
 
 
+def _assign_links(note: Note, links: list[NoteLinkMetadata]) -> None:
+    """Replace note links with a normalized list of structured source links."""
+    note.links.clear()
+    for link in links:
+        note.links.append(
+            NoteLink(
+                source_id=link.source_id,
+                source_file=link.source_file,
+                page_number=link.page_number,
+                chunk_id=link.chunk_id,
+            )
+        )
+
+
 def create_note(db: Session, payload: NoteCreateRequest) -> NoteResponse:
-    """
-    Create and persist a new note.
-
-    Args:
-        db: Active SQLAlchemy session.
-        payload: Incoming note creation payload.
-
-    Returns:
-        Created note as a response schema.
-    """
+    """Create and persist a new note."""
     inferred_tags, extracted_metadata, normalized_content = _run_note_enrichment(payload.content, payload.tags)
 
     frontmatter = payload.frontmatter.copy() if payload.frontmatter else {}
@@ -194,6 +217,7 @@ def create_note(db: Session, payload: NoteCreateRequest) -> NoteResponse:
         folder_id=payload.folder_id,
     )
     note.tags = [NoteTag(tag=tag) for tag in inferred_tags]
+    _assign_links(note, payload.sources)
 
     db.add(note)
     db.commit()
@@ -202,33 +226,13 @@ def create_note(db: Session, payload: NoteCreateRequest) -> NoteResponse:
 
 
 def list_notes(db: Session) -> list[NoteResponse]:
-    """
-    List all notes sorted by newest update first.
-
-    Args:
-        db: Active SQLAlchemy session.
-
-    Returns:
-        Ordered list of note response objects.
-    """
+    """List all notes sorted by newest update first."""
     notes = db.query(Note).order_by(Note.updated_at.desc(), Note.id.desc()).all()
     return [_to_response(note) for note in notes]
 
 
 def get_note(db: Session, note_id: int) -> NoteResponse:
-    """
-    Retrieve a note by ID.
-
-    Args:
-        db: Active SQLAlchemy session.
-        note_id: Note identifier.
-
-    Returns:
-        Retrieved note schema.
-
-    Raises:
-        HTTPException: If no note exists for ``note_id``.
-    """
+    """Retrieve a note by ID."""
     note = db.get(Note, note_id)
     if note is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
@@ -236,20 +240,7 @@ def get_note(db: Session, note_id: int) -> NoteResponse:
 
 
 def update_note(db: Session, note_id: int, payload: NoteUpdateRequest) -> NoteResponse:
-    """
-    Replace an existing note and bump the ``updated_at`` timestamp.
-
-    Args:
-        db: Active SQLAlchemy session.
-        note_id: Note identifier.
-        payload: Replacement note payload.
-
-    Returns:
-        Updated note schema.
-
-    Raises:
-        HTTPException: If no note exists for ``note_id``.
-    """
+    """Replace an existing note and bump the ``updated_at`` timestamp."""
     note = db.get(Note, note_id)
     if note is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
@@ -274,23 +265,110 @@ def update_note(db: Session, note_id: int, payload: NoteUpdateRequest) -> NoteRe
 
     note.tags.clear()
     note.tags.extend(NoteTag(tag=tag) for tag in inferred_tags)
+    _assign_links(note, payload.sources)
 
     db.commit()
     db.refresh(note)
     return _to_response(note)
 
 
-def delete_note(db: Session, note_id: int) -> None:
+def suggest_note_links(
+    db: Session,
+    note_id: int,
+    payload: NoteLinkSuggestionRequest,
+) -> NoteLinkSuggestionResponse:
     """
-    Delete an existing note.
+    Suggest source links for a note using semantic similarity and keyword overlap.
 
     Args:
         db: Active SQLAlchemy session.
         note_id: Note identifier.
+        payload: Suggestion parameters, including maximum result size.
+
+    Returns:
+        A response containing structured link suggestions.
 
     Raises:
-        HTTPException: If no note exists for ``note_id``.
+        HTTPException: If the note does not exist.
     """
+    note = db.get(Note, note_id)
+    if note is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+
+    note_keywords = _keywords(note.content_markdown)
+    if not note_keywords:
+        return NoteLinkSuggestionResponse(note_id=note.id, suggestions=[])
+
+    client = get_chroma_client()
+    try:
+        collection = client.get_collection(name="knowledge_base")
+    except ValueError:
+        return NoteLinkSuggestionResponse(note_id=note.id, suggestions=[])
+
+    semantic_results = collection.query(
+        query_texts=[note.content_markdown],
+        n_results=max(payload.limit * 2, 10),
+        include=["documents", "metadatas", "distances"],
+    )
+    keyword_results = collection.get(include=["documents", "metadatas"])
+
+    candidates: dict[str, dict[str, Any]] = {}
+
+    ids = semantic_results.get("ids", [[]])[0]
+    documents = semantic_results.get("documents", [[]])[0]
+    metadatas = semantic_results.get("metadatas", [[]])[0]
+    distances = semantic_results.get("distances", [[]])[0]
+
+    for chunk_id, document, metadata, distance in zip(ids, documents, metadatas, distances):
+        doc_keywords = _keywords(document or "")
+        keyword_overlap = len(note_keywords.intersection(doc_keywords))
+        similarity_score = max(0.0, min(1.0, 1.0 - float(distance or 1.0)))
+        candidates[chunk_id] = {
+            "source_id": (metadata or {}).get("source_id") or (metadata or {}).get("source"),
+            "source_file": (metadata or {}).get("source"),
+            "page_number": (metadata or {}).get("page") or (metadata or {}).get("page_number"),
+            "chunk_id": chunk_id,
+            "snippet": (document or "")[:280],
+            "similarity_score": similarity_score,
+            "keyword_overlap": keyword_overlap,
+        }
+
+    for chunk_id, document, metadata in zip(
+        keyword_results.get("ids", []),
+        keyword_results.get("documents", []),
+        keyword_results.get("metadatas", []),
+    ):
+        doc_keywords = _keywords(document or "")
+        keyword_overlap = len(note_keywords.intersection(doc_keywords))
+        if keyword_overlap == 0:
+            continue
+        if chunk_id not in candidates:
+            candidates[chunk_id] = {
+                "source_id": (metadata or {}).get("source_id") or (metadata or {}).get("source"),
+                "source_file": (metadata or {}).get("source"),
+                "page_number": (metadata or {}).get("page") or (metadata or {}).get("page_number"),
+                "chunk_id": chunk_id,
+                "snippet": (document or "")[:280],
+                "similarity_score": 0.0,
+                "keyword_overlap": keyword_overlap,
+            }
+        else:
+            candidates[chunk_id]["keyword_overlap"] = max(candidates[chunk_id]["keyword_overlap"], keyword_overlap)
+
+    ranked = sorted(
+        candidates.values(),
+        key=lambda item: (item["similarity_score"], item["keyword_overlap"]),
+        reverse=True,
+    )[: payload.limit]
+
+    return NoteLinkSuggestionResponse(
+        note_id=note.id,
+        suggestions=[NoteLinkSuggestion(**item) for item in ranked],
+    )
+
+
+def delete_note(db: Session, note_id: int) -> None:
+    """Delete an existing note."""
     note = db.get(Note, note_id)
     if note is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
