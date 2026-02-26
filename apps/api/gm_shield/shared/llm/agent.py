@@ -5,7 +5,7 @@ Provides a foundational class for all specific agents, handling prompt construct
 LLM interaction, and logging.
 """
 
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import AsyncGenerator
 
 from gm_shield.core.logging import get_logger
 from gm_shield.shared.llm.client import get_llm_client
