@@ -28,6 +28,7 @@ export function ChatPanel() {
 	const scrollRef = useRef<HTMLDivElement>(null);
 
 	// Auto-scroll to bottom
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Auto-scroll on new messages
 	useEffect(() => {
 		if (scrollRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -67,7 +68,7 @@ export function ChatPanel() {
 				setMessages((prev) =>
 					prev.map((m) =>
 						m.id === botMsgId
-							? { ...m, content: m.content + `\n\n**Error**: ${err.message}` }
+							? { ...m, content: `${m.content}\n\n**Error**: ${err.message}` }
 							: m,
 					),
 				);
@@ -137,7 +138,14 @@ export function ChatPanel() {
 												{...props}
 											/>
 										),
-										code: ({ node, inline, className, children, ...props }: any) => {
+										code: ({
+											node,
+											inline,
+											className,
+											children,
+											...props
+											// biome-ignore lint/suspicious/noExplicitAny: ReactMarkdown props are complex
+										}: any) => {
 											return inline ? (
 												<code
 													className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded font-mono text-xs"
