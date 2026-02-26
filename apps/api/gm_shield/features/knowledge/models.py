@@ -4,8 +4,8 @@ Pydantic schemas for the Knowledge feature slice.
 Defines the request and response models used by the knowledge ingestion router.
 """
 
-from pydantic import BaseModel, Field
 from typing import Optional
+from pydantic import BaseModel, Field
 
 
 class KnowledgeSourceCreate(BaseModel):
@@ -52,4 +52,50 @@ class KnowledgeSourceResponse(BaseModel):
         ...,
         description="Human-readable message describing the outcome of the request.",
         examples=["Processing started for monster-manual.pdf"],
+    )
+
+
+class KnowledgeSourceItem(BaseModel):
+    """
+    Summary of a single ingested knowledge source, derived from ChromaDB metadata.
+    """
+
+    source: str = Field(
+        ...,
+        description="Absolute path to the original source file.",
+        examples=["/Users/gm/docs/monster-manual.pdf"],
+    )
+    filename: str = Field(
+        ...,
+        description="Basename of the source file.",
+        examples=["monster-manual.pdf"],
+    )
+    chunk_count: int = Field(
+        ...,
+        description="Number of text chunks stored in ChromaDB for this source.",
+        examples=[42],
+    )
+
+
+class KnowledgeListResponse(BaseModel):
+    """Response for listing all ingested knowledge sources."""
+
+    items: list[KnowledgeSourceItem] = Field(
+        default_factory=list,
+        description="All unique source documents currently indexed in ChromaDB.",
+    )
+
+
+class KnowledgeStatsResponse(BaseModel):
+    """Aggregate statistics for the knowledge base."""
+
+    document_count: int = Field(
+        ...,
+        description="Number of distinct source documents in the knowledge base.",
+        examples=[12],
+    )
+    chunk_count: int = Field(
+        ...,
+        description="Total number of text chunks stored across all documents.",
+        examples=[1420],
     )

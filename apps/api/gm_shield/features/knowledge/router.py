@@ -1,17 +1,25 @@
 """
 Knowledge feature — HTTP router.
 
-Handles document ingestion requests. All heavy processing (text extraction,
-chunking, embedding, ChromaDB storage) runs asynchronously in the background
-via the task queue so that the HTTP response is returned immediately.
+Handles document ingestion requests and knowledge base queries.
+All heavy processing (text extraction, chunking, embedding, ChromaDB storage)
+runs asynchronously in the background via the task queue so that the HTTP
+response is returned immediately.
 """
 
 from fastapi import APIRouter, status
 from gm_shield.features.knowledge.models import (
+    KnowledgeListResponse,
     KnowledgeSourceCreate,
+    KnowledgeSourceItem,
     KnowledgeSourceResponse,
+    KnowledgeStatsResponse,
 )
-from gm_shield.features.knowledge.service import process_knowledge_source
+from gm_shield.features.knowledge.service import (
+    get_knowledge_list,
+    get_knowledge_stats,
+    process_knowledge_source,
+)
 from gm_shield.shared.worker.memory import get_task_queue
 
 router = APIRouter()
@@ -62,3 +70,43 @@ async def add_knowledge_source(source: KnowledgeSourceCreate):
         status="pending",
         message=f"Processing started for {source.file_path}",
     )
+
+
+@router.get(
+    "/",
+    response_model=KnowledgeListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List all ingested knowledge sources",
+    description=(
+        "Returns all unique source documents currently stored in the ChromaDB "
+        "`knowledge_base` collection, grouped by file path.\n\n"
+        "Each item includes the source path, filename, and the number of text "
+        "chunks stored for that document."
+    ),
+)
+async def list_knowledge_sources():
+    """
+    List all distinct knowledge source documents in the vector store.
+
+    Results are derived from ChromaDB chunk metadata and grouped by source file.
+    Returns an empty list when no documents have been ingested yet.
+    """
+    raw = await get_knowledge_list()
+    items = [KnowledgeSourceItem(**entry) for entry in raw]
+    return KnowledgeListResponse(items=items)
+
+
+@router.get(
+    "/stats",
+    response_model=KnowledgeStatsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Knowledge base aggregate statistics",
+    description=(
+        "Returns aggregate statistics for the knowledge base: total distinct "
+        "documents and total chunk count stored in ChromaDB."
+    ),
+)
+async def knowledge_stats():
+    """Return aggregate statistics for the ChromaDB knowledge base collection."""
+    stats = await get_knowledge_stats()
+    return KnowledgeStatsResponse(**stats)

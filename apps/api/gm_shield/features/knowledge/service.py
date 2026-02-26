@@ -187,3 +187,57 @@ async def process_knowledge_source(file_path: str) -> str:
     """
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _process_sync, file_path)
+
+
+# ── List & stats ──────────────────────────────────────────────────────────────
+
+
+def _list_sources_sync() -> list[dict]:
+    """
+    Query ChromaDB and aggregate chunk metadata by source file (blocking).
+
+    Returns a list of dicts with keys: ``source``, ``filename``, ``chunk_count``.
+    """
+    client = get_chroma_client()
+    try:
+        collection = client.get_collection(name="knowledge_base")
+    except Exception:
+        # Collection does not exist yet — no documents ingested.
+        return []
+
+    result = collection.get(include=["metadatas"])
+    metadatas = result.get("metadatas") or []
+
+    # Group by source file path
+    sources: dict[str, int] = {}
+    for meta in metadatas:
+        src = meta.get("source", "unknown") if meta else "unknown"
+        sources[src] = sources.get(src, 0) + 1
+
+    return [
+        {"source": src, "filename": src.split("/")[-1], "chunk_count": count}
+        for src, count in sorted(sources.items())
+    ]
+
+
+async def get_knowledge_list() -> list[dict]:
+    """
+    Async wrapper — returns a list of unique knowledge sources from ChromaDB.
+
+    Each item contains: ``source``, ``filename``, ``chunk_count``.
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _list_sources_sync)
+
+
+async def get_knowledge_stats() -> dict:
+    """
+    Async wrapper — returns aggregate stats for the knowledge base.
+
+    Returns a dict with: ``document_count``, ``chunk_count``.
+    """
+    items = await get_knowledge_list()
+    return {
+        "document_count": len(items),
+        "chunk_count": sum(i["chunk_count"] for i in items),
+    }
