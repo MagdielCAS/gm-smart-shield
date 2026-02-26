@@ -1,6 +1,7 @@
 import {
 	BookOpen,
 	Home,
+	MessageSquare,
 	Monitor,
 	Moon,
 	// Settings,
@@ -25,6 +26,7 @@ export function Layout() {
 	const navItems = [
 		{ href: "/", label: "Dashboard", icon: Home },
 		{ href: "/knowledge", label: "Knowledge", icon: BookOpen },
+		{ href: "/chat", label: "AI Chat", icon: MessageSquare },
 		// Deactivated for now
 		// { href: "/settings", label: "Settings", icon: Settings },
 	];
@@ -122,7 +124,7 @@ export function Layout() {
 
 				{/* Scrollable Content */}
 				<main className="flex-1 overflow-y-auto p-6 md:p-8">
-					<div className="mx-auto max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+					<div className="mx-auto max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-500 h-full">
 						<Outlet />
 					</div>
 				</main>

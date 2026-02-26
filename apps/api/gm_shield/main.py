@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from gm_shield.core.config import settings
 from gm_shield.core.logging import configure_logging, get_logger
 from gm_shield.shared.database.sqlite import engine, Base
+from gm_shield.features.chat import routes as chat_routes
 from gm_shield.features.health import routes as health_routes
 from gm_shield.features.knowledge import router as knowledge_router_module
 from gm_shield.core.telemetry import setup_telemetry
@@ -28,6 +29,7 @@ _DESCRIPTION = """
 
 - **Knowledge Base** — ingest PDF, Markdown, text, and CSV files into a vector store for semantic search.
 - **Health** — check the status of all infrastructure dependencies (SQLite, ChromaDB, Ollama).
+- **Chat** — RAG-based Q&A with the knowledge base.
 
 ## Local-first design
 
@@ -45,6 +47,14 @@ _TAGS_METADATA = [
     {
         "name": "Health",
         "description": "Infrastructure health checks for SQLite, ChromaDB, and Ollama.",
+    },
+    {
+        "name": "System",
+        "description": "System-level status and configuration checks.",
+    },
+    {
+        "name": "Chat",
+        "description": "Query the AI agent for RAG-based answers.",
     },
 ]
 
@@ -132,4 +142,10 @@ app.include_router(
     knowledge_router_module.router,
     prefix=f"{settings.API_V1_STR}/knowledge",
     tags=["Knowledge"],
+)
+
+app.include_router(
+    chat_routes.router,
+    prefix=f"{settings.API_V1_STR}/chat",
+    tags=["Chat"],
 )

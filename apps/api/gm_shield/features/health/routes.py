@@ -6,21 +6,23 @@ Exposes ``GET /api/v1/health/status`` which checks the three core dependencies:
 - **ChromaDB** — calls the client heartbeat
 - **Ollama** — fetches the model tag list and verifies all required models are present
 
-The endpoint always returns HTTP 200 with a structured payload so monitoring tools
-can distinguish between partial and full degradation without relying on status codes.
+Also exposes ``GET /api/v1/system/llm-health`` for a focused AI subsystem check.
 """
 
+from typing import Dict, List
+
+import httpx
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
-from typing import Dict, List
-import httpx
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from gm_shield.core.config import settings
 from gm_shield.core.logging import get_logger
-from gm_shield.shared.database.sqlite import get_db
 from gm_shield.shared.database.chroma import get_chroma_client
+from gm_shield.shared.database.sqlite import get_db
+from gm_shield.shared.llm import config as llm_config
+from gm_shield.shared.llm.client import get_llm_client
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -141,7 +143,7 @@ async def check_health_status(db: Session = Depends(get_db)):
                 logger.info("ollama_ok", available_models=available_models)
 
                 for required in required_models:
-                    # Exact match first; fall back to prefix match (e.g. "llama3.2:3b" in "llama3.2:3b-instruct")
+                    # Exact match first; fall back to prefix match
                     if required in available_models or any(
                         avail.startswith(required) for avail in available_models
                     ):
@@ -161,3 +163,65 @@ async def check_health_status(db: Session = Depends(get_db)):
         health.errors.append(f"Ollama check error: {str(e)}")
 
     return health
+
+
+# ── LLM Health ───────────────────────────────────────────────────────────────
+
+
+class LLMHealthResponse(BaseModel):
+    """
+    Simplified health status for the AI subsystem.
+    Used by the frontend to show a 'ready' indicator.
+    """
+
+    status: str = Field(
+        ..., description="Overall status: 'ready', 'pulling', or 'error'."
+    )
+    models: Dict[str, bool] = Field(..., description="Availability of required models.")
+
+
+@router.get(
+    "/api/v1/system/llm-health",
+    response_model=LLMHealthResponse,
+    tags=["System"],
+    summary="Check AI subsystem health",
+    description="Verifies that Ollama is reachable and all required models are pulled.",
+)
+async def check_llm_health():
+    """
+    Check if Ollama is running and all required models are pulled.
+    Uses the internal OllamaClient for verification.
+    """
+    client = get_llm_client()
+    required_models = list(
+        {
+            llm_config.MODEL_QUERY,
+            llm_config.MODEL_REFERENCE_SMART,
+            llm_config.MODEL_ENCOUNTER,
+        }
+    )
+
+    models_status = {m: False for m in required_models}
+    all_ready = True
+
+    try:
+        available = await client.list_models()
+        available_names = [m["name"] for m in available]
+
+        for req in required_models:
+            # Check for exact or prefix match
+            is_present = req in available_names or any(
+                a.startswith(req) for a in available_names
+            )
+            models_status[req] = is_present
+            if not is_present:
+                all_ready = False
+
+        return LLMHealthResponse(
+            status="ready" if all_ready else "pulling",
+            models=models_status,
+        )
+    except Exception as e:
+        logger.error("llm_health_check_failed", error=str(e))
+        # Return error status but preserve model list structure
+        return LLMHealthResponse(status="error", models=models_status)
