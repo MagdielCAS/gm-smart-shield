@@ -29,6 +29,40 @@ export type NotePayload = {
 	sources?: NoteLinkMetadata[];
 };
 
+export type InlineSuggestionPayload = {
+	content: string;
+	cursor_index: number;
+};
+
+export type InlineSuggestionResponse = {
+	suggestion: string;
+	reason: "punctuation" | "newline" | "idle" | "none";
+};
+
+export type TransformAction =
+	| "rewrite"
+	| "format"
+	| "make_dramatic"
+	| "generate_content"
+	| "add_reference_link"
+	| "search_reference_link";
+
+export type TransformPayload = {
+	action: TransformAction;
+	content: string;
+	selection_start: number;
+	selection_end: number;
+};
+
+export type TransformPreview = {
+	action: TransformAction;
+	original_text: string;
+	preview_text: string;
+	selection_start: number;
+	selection_end: number;
+	mode: "replace" | "insert";
+};
+
 type NoteListResponse = { items: Note[] };
 
 async function parseJsonOrThrow<T>(response: Response): Promise<T> {
@@ -77,4 +111,26 @@ export async function deleteNote(noteId: number): Promise<void> {
 		const error = await response.json().catch(() => ({}));
 		throw new Error(error.detail ?? "Failed to delete note");
 	}
+}
+
+export async function suggestInlineText(
+	payload: InlineSuggestionPayload,
+): Promise<InlineSuggestionResponse> {
+	const response = await fetch("/api/v1/notes/inline-suggest", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(payload),
+	});
+	return parseJsonOrThrow<InlineSuggestionResponse>(response);
+}
+
+export async function previewNoteTransform(
+	payload: TransformPayload,
+): Promise<TransformPreview> {
+	const response = await fetch("/api/v1/notes/transform/preview", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(payload),
+	});
+	return parseJsonOrThrow<TransformPreview>(response);
 }

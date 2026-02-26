@@ -17,11 +17,16 @@ from sqlalchemy.orm import Session
 from gm_shield.features.notes.entities import Note, NoteLink, NoteTag
 from gm_shield.features.notes.models import (
     NoteCreateRequest,
+    NoteInlineSuggestionRequest,
+    NoteInlineSuggestionResponse,
     NoteLinkMetadata,
     NoteLinkSuggestion,
     NoteLinkSuggestionRequest,
     NoteLinkSuggestionResponse,
     NoteResponse,
+    NoteTransformAction,
+    NoteTransformRequest,
+    NoteTransformResponse,
     NoteUpdateRequest,
 )
 from gm_shield.shared.database.chroma import get_chroma_client
@@ -49,6 +54,15 @@ STOPWORDS = {
     "was",
     "were",
     "with",
+}
+
+TRANSFORM_ACTIONS = {
+    NoteTransformAction.REWRITE,
+    NoteTransformAction.FORMAT,
+    NoteTransformAction.MAKE_DRAMATIC,
+    NoteTransformAction.GENERATE_CONTENT,
+    NoteTransformAction.ADD_REFERENCE_LINK,
+    NoteTransformAction.SEARCH_REFERENCE_LINK,
 }
 
 
@@ -156,6 +170,102 @@ def _keywords(text: str) -> set[str]:
         for token in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", text.lower())
         if token not in STOPWORDS
     }
+
+
+def _safe_slice(content: str, start: int, end: int) -> tuple[int, int, str]:
+    """Clamp selection bounds and return the selected segment.
+
+    Args:
+        content: Full content string.
+        start: Raw selection start.
+        end: Raw selection end.
+
+    Returns:
+        A tuple of clamped ``(start, end, selected_text)``.
+    """
+    clamped_start = max(0, min(start, len(content)))
+    clamped_end = max(clamped_start, min(end, len(content)))
+    return clamped_start, clamped_end, content[clamped_start:clamped_end]
+
+
+def suggest_inline_text(payload: NoteInlineSuggestionRequest) -> NoteInlineSuggestionResponse:
+    """Generate ghost-text continuation for phrase-boundary editor events.
+
+    Args:
+        payload: Current editor content and cursor location.
+
+    Returns:
+        A deterministic local suggestion payload for ghost-text rendering.
+    """
+    cursor_index = min(payload.cursor_index, len(payload.content))
+    prefix = payload.content[:cursor_index]
+    tail = prefix.rstrip()
+    if not tail:
+        return NoteInlineSuggestionResponse(suggestion="", reason="none")
+
+    reason = "idle"
+    if tail.endswith("\n"):
+        reason = "newline"
+    elif tail[-1] in ".!?;:":
+        reason = "punctuation"
+
+    words = re.findall(r"[A-Za-z][A-Za-z'-]{2,}", tail)
+    subject = words[-1] if words else "scene"
+    templates = {
+        "newline": f"- {subject.capitalize()} detail: ",
+        "punctuation": " Next, ",
+        "idle": " and ",
+    }
+    return NoteInlineSuggestionResponse(suggestion=templates[reason], reason=reason)
+
+
+def preview_transform(payload: NoteTransformRequest) -> NoteTransformResponse:
+    """Create non-destructive previews for note context-menu actions.
+
+    Args:
+        payload: Requested action and editor selection details.
+
+    Returns:
+        A preview response that can be applied by the client.
+
+    Raises:
+        HTTPException: If action is unsupported or selection bounds are invalid.
+    """
+    if payload.action not in TRANSFORM_ACTIONS:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unsupported action")
+
+    start, end, selected_text = _safe_slice(payload.content, payload.selection_start, payload.selection_end)
+    base_text = selected_text.strip() or payload.content.strip()
+    if payload.action == NoteTransformAction.REWRITE:
+        preview = f"{base_text} (rewritten for clarity)"
+        mode = "replace"
+    elif payload.action == NoteTransformAction.FORMAT:
+        preview = "\n".join(line.strip() for line in base_text.splitlines() if line.strip())
+        mode = "replace"
+    elif payload.action == NoteTransformAction.MAKE_DRAMATIC:
+        preview = f"⚔️ {base_text} The air crackles with ominous intent."
+        mode = "replace"
+    elif payload.action == NoteTransformAction.GENERATE_CONTENT:
+        seed = base_text or "Scene prompt"
+        preview = f"{seed}\n- Stakes escalate when an unseen rival intervenes."
+        mode = "insert" if not selected_text.strip() else "replace"
+    elif payload.action == NoteTransformAction.ADD_REFERENCE_LINK:
+        anchor = base_text or "reference"
+        preview = f"[{anchor}](ref://knowledge/{re.sub(r'[^a-z0-9]+', '-', anchor.lower()).strip('-') or 'entry'})"
+        mode = "replace"
+    else:
+        keyword = base_text or "lore"
+        preview = f"Related references: {keyword} compendium, faction dossier, regional timeline"
+        mode = "insert"
+
+    return NoteTransformResponse(
+        action=payload.action,
+        original_text=selected_text,
+        preview_text=preview,
+        selection_start=start,
+        selection_end=end,
+        mode=mode,
+    )
 
 
 def _to_response(note: Note) -> NoteResponse:

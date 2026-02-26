@@ -207,4 +207,60 @@ describe("NotesPage", () => {
 			);
 		});
 	});
+
+	it("shows ghost suggestion and applies preview action", async () => {
+		mockFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ items: [] }),
+			} as Response)
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ suggestion: " Next, ", reason: "punctuation" }),
+			} as Response)
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					action: "rewrite",
+					original_text: "caravan",
+					preview_text: "caravan (rewritten for clarity)",
+					selection_start: 4,
+					selection_end: 11,
+					mode: "replace",
+				}),
+			} as Response);
+
+		render(<NotesPage />, { wrapper });
+
+		const markdownInput = screen.getByLabelText("Markdown");
+		fireEvent.change(markdownInput, {
+			target: { value: "The caravan vanished.", selectionStart: 20 },
+		});
+
+		await waitFor(() => {
+			expect(mockFetch).toHaveBeenCalledWith(
+				"/api/v1/notes/inline-suggest",
+				expect.objectContaining({ method: "POST" }),
+			);
+		});
+
+		(markdownInput as HTMLTextAreaElement).setSelectionRange(4, 11);
+		fireEvent.contextMenu(markdownInput, {
+			clientX: 100,
+			clientY: 100,
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Rewrite" }));
+
+		await waitFor(() => {
+			expect(mockFetch).toHaveBeenCalledWith(
+				"/api/v1/notes/transform/preview",
+				expect.objectContaining({ method: "POST" }),
+			);
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Apply to draft" }));
+		expect(
+			screen.getByDisplayValue(/rewritten for clarity/),
+		).toBeInTheDocument();
+	});
 });
