@@ -3,6 +3,7 @@ import {
 	Home,
 	Monitor,
 	Moon,
+	NotebookPen,
 	// Settings,
 	Shield,
 	Sun,
@@ -25,6 +26,7 @@ export function Layout() {
 	const navItems = [
 		{ href: "/", label: "Dashboard", icon: Home },
 		{ href: "/knowledge", label: "Knowledge", icon: BookOpen },
+		{ href: "/notes", label: "Notes", icon: NotebookPen },
 		// Deactivated for now
 		// { href: "/settings", label: "Settings", icon: Settings },
 	];
