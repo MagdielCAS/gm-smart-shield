@@ -4,6 +4,7 @@ import { Layout } from "./components/Layout";
 import ChatPage from "./pages/ChatPage";
 import { Home } from "./pages/Home";
 import KnowledgePage from "./pages/KnowledgePage";
+import NotesPage from "./pages/NotesPage";
 
 const queryClient = new QueryClient();
 const Router =
@@ -18,6 +19,7 @@ function App() {
 						<Route index element={<Home />} />
 						<Route path="knowledge" element={<KnowledgePage />} />
 						<Route path="chat" element={<ChatPage />} />
+						<Route path="notes" element={<NotesPage />} />
 					</Route>
 				</Routes>
 			</Router>
