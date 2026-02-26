@@ -39,5 +39,6 @@ jobs:
       run: pnpm electron:build
 
     - name: Verify Electron Pack (Dry Run)
-      # Build for Linux (dir target) to verify config
-      run: pnpm electron-builder --dir --linux
+      # Use the Electron binary downloaded during `pnpm install` to avoid
+      # fetching release archives from GitHub during packaging.
+      run: pnpm electron-builder --dir --linux -c.electronDist=./node_modules/electron/dist
