@@ -322,7 +322,7 @@ def suggest_note_links(
     for chunk_id, document, metadata, distance in zip(ids, documents, metadatas, distances):
         doc_keywords = _keywords(document or "")
         keyword_overlap = len(note_keywords.intersection(doc_keywords))
-        similarity_score = max(0.0, min(1.0, 1.0 - float(distance or 1.0)))
+        similarity_score = max(0.0, min(1.0, 1.0 - float(distance if distance is not None else 1.0)))
         candidates[chunk_id] = {
             "source_id": (metadata or {}).get("source_id") or (metadata or {}).get("source"),
             "source_file": (metadata or {}).get("source"),
