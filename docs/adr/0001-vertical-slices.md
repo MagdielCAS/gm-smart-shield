@@ -1,6 +1,6 @@
 # 0001. Use Vertical Slices Architecture
 
-Date: 2024-05-22
+Date: 2026-02-24
 
 ## Status
 
