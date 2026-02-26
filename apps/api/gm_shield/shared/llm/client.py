@@ -1,122 +1,119 @@
 """
-Shared LLM Client (Ollama).
-
-Provides a centralized AsyncClient for interacting with the local Ollama instance.
-Handles connection pooling, logging, and common generation patterns.
+Shared LLM Client for Ollama.
 """
 
-from typing import Any, AsyncGenerator, Dict, List, Optional
+import json
+import httpx
+from typing import List, Optional, Any, AsyncGenerator, Dict, Union
+from enum import Enum
+from pydantic import BaseModel
+import structlog
 
-from ollama import AsyncClient
+logger = structlog.get_logger(__name__)
 
-from gm_shield.core.logging import get_logger
-from gm_shield.shared.llm import config
+class Role(str, Enum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
 
-logger = get_logger(__name__)
+class Message(BaseModel):
+    role: Role
+    content: str
+    images: Optional[List[str]] = None
 
+class ChatResponse(BaseModel):
+    model: str
+    created_at: str
+    message: Optional[Message] = None
+    done: bool
+    total_duration: Optional[int] = None
+    load_duration: Optional[int] = None
+    prompt_eval_count: Optional[int] = None
+    eval_count: Optional[int] = None
 
-class OllamaClientWrapper:
+class OllamaClient:
     """
-    Wrapper around ollama.AsyncClient providing structured logging and consistent error handling.
+    Async client for Ollama API.
     """
 
-    def __init__(self, host: str = config.OLLAMA_HOST):
-        self.client = AsyncClient(host=host)
-        self.host = host
+    def __init__(self, base_url: str = "http://localhost:11434"):
+        self.base_url = base_url
+        self.client = httpx.AsyncClient(base_url=base_url, timeout=120.0)
 
     async def generate(
         self,
-        prompt: str,
-        model: str = config.MODEL_QUERY,
-        system: Optional[str] = None,
-        format: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None,
-    ) -> str:
+        model: str,
+        messages: List[Message],
+        stream: bool = False,
+        format: Optional[Union[str, Dict[str, Any]]] = None, # JSON schema or 'json'
+        options: Optional[Dict[str, Any]] = None
+    ) -> Union[ChatResponse, AsyncGenerator[ChatResponse, None]]:
         """
-        Generate a complete response (non-streaming).
-
-        Args:
-            prompt: The user prompt.
-            model: The model name to use.
-            system: Optional system prompt.
-            format: Optional format (e.g. 'json').
-            options: Optional generation parameters (temperature, etc.).
-
-        Returns:
-            The complete generated text.
+        Generate a chat completion.
         """
-        logger.info("llm_generate_start", model=model)
+        payload = {
+            "model": model,
+            "messages": [m.model_dump(exclude_none=True) for m in messages],
+            "stream": stream,
+        }
+
+        if format:
+            payload["format"] = format
+
+        if options:
+            payload["options"] = options
+
         try:
-            response = await self.client.generate(
-                model=model,
-                prompt=prompt,
-                system=system,
-                format=format,
-                options=options,
-                stream=False,
-            )
-            duration = response.get("total_duration")
-            logger.info("llm_generate_complete", model=model, duration=duration)
-            return response["response"]
-        except Exception as e:
-            logger.error("llm_generate_failed", model=model, error=str(e))
+            if stream:
+                return self._stream_response(payload)
+            else:
+                response = await self.client.post("/api/chat", json=payload)
+                response.raise_for_status()
+                return ChatResponse(**response.json())
+
+        except httpx.RequestError as e:
+            logger.error("ollama_request_failed", error=str(e))
             raise
 
-    async def stream(
-        self,
-        prompt: str,
-        model: str = config.MODEL_QUERY,
-        system: Optional[str] = None,
-        format: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None,
-    ) -> AsyncGenerator[str, None]:
-        """
-        Stream the response chunk by chunk.
+    async def _stream_response(self, payload: Dict[str, Any]) -> AsyncGenerator[ChatResponse, None]:
+        async with self.client.stream("POST", "/api/chat", json=payload) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    yield ChatResponse(**data)
+                except json.JSONDecodeError:
+                    logger.warning("ollama_stream_decode_error", line=line)
+                    continue
 
-        Yields:
-            Text chunks as they are generated.
-        """
-        logger.info("llm_stream_start", model=model)
+    async def list_models(self) -> List[str]:
+        """List available local models."""
         try:
-            # According to Ollama python client docs, generate(stream=True) returns an async generator
-            stream_gen = await self.client.generate(
-                model=model,
-                prompt=prompt,
-                system=system,
-                format=format,
-                options=options,
-                stream=True,
-            )
-            async for chunk in stream_gen:
-                yield chunk["response"]
-
-            logger.info("llm_stream_complete", model=model)
+            response = await self.client.get("/api/tags")
+            response.raise_for_status()
+            data = response.json()
+            return [model["name"] for model in data.get("models", [])]
         except Exception as e:
-            logger.error("llm_stream_failed", model=model, error=str(e))
-            raise
+            logger.error("ollama_list_models_failed", error=str(e))
+            return []
 
-    async def list_models(self) -> List[Dict[str, Any]]:
-        """
-        List available models on the Ollama server.
+    async def pull_model(self, model: str) -> AsyncGenerator[Dict[str, Any], None]:
+        """Pull a model from the library."""
+        payload = {"name": model}
+        async with self.client.stream("POST", "/api/pull", json=payload) as response:
+             response.raise_for_status()
+             async for line in response.aiter_lines():
+                if not line:
+                    continue
+                yield json.loads(line)
 
-        Returns:
-            A list of model dictionaries (name, size, digest, etc.).
-        """
-        try:
-            response = await self.client.list()
-            return response.get("models", [])
-        except Exception as e:
-            logger.error("llm_list_models_failed", error=str(e))
-            raise
-
-
-# Singleton instance
 _client_instance = None
 
-
-def get_llm_client() -> OllamaClientWrapper:
-    """Return the shared Ollama client instance."""
+def get_llm_client() -> OllamaClient:
+    """Returns a singleton instance of the Ollama client."""
     global _client_instance
     if _client_instance is None:
-        _client_instance = OllamaClientWrapper()
+        _client_instance = OllamaClient()
     return _client_instance

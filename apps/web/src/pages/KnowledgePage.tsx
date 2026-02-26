@@ -40,7 +40,7 @@ interface KnowledgeSourceItem {
 	started_at: string | null;
 	last_indexed_at: string | null;
 	error_message: string | null;
-	features: string[];
+	features: string[]; // ["indexation", "character_sheet", "quick_reference"]
 }
 
 interface KnowledgeListResponse {
@@ -192,61 +192,48 @@ const KnowledgePage = () => {
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case "completed":
-				return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20 border";
+				return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20 border-transparent";
 			case "failed":
-				return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20 border";
+				return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20 border-transparent";
 			case "running":
 			case "pending":
-				return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 border";
+				return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 border-transparent";
 			default:
-				return "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20 border";
+				return "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20 border-transparent";
 		}
 	};
 
-	/**
-	 * Calculates estimated time remaining based on start time and current progress percentage.
-	 * Returns a human-readable string (e.g., "~ 2 min remaining") or null if indeterminate.
-	 */
-	const getEstimatedTimeRemaining = (
-		startedAt: string | null,
-		progress: number,
-	) => {
-		if (!startedAt || progress <= 0 || progress >= 100) return null;
+	// Helper to render feature badges
+	const renderFeatureBadge = (feature: string) => {
+		const featureLabels: Record<string, string> = {
+			indexation: "Indexed",
+			character_sheet: "Sheet Template",
+			quick_reference: "Quick Ref",
+		};
+		const label = featureLabels[feature] || feature;
 
-		const start = new Date(startedAt).getTime();
-		const now = Date.now();
-		const elapsed = now - start; // in ms
-
-		if (elapsed < 0) return null;
-		if (elapsed < 2000) return "Calculating..."; // Give it a moment to stabilize
-
-		const totalEstimated = (elapsed / progress) * 100;
-		const remaining = totalEstimated - elapsed;
-
-		if (remaining < 0) return "Almost done...";
-
-		const seconds = Math.floor(remaining / 1000);
-		if (seconds < 60) return "< 1 min remaining";
-
-		const minutes = Math.floor(seconds / 60);
-		return `~ ${minutes} min remaining`;
+		return (
+			<span
+				key={feature}
+				className="inline-flex items-center rounded-md bg-secondary/50 px-2 py-1 text-xs font-medium ring-1 ring-inset ring-gray-500/10"
+			>
+				{label}
+			</span>
+		);
 	};
 
 	return (
-		<div className="space-y-8">
+		<div className="space-y-8 p-6 max-w-7xl mx-auto">
 			{/* Header Section */}
 			<div className="flex items-end justify-between">
 				<div>
 					<h2 className="text-3xl font-bold tracking-tight">Knowledge Base</h2>
 					<p className="mt-2 text-muted-foreground max-w-lg">
-						Manage your game master resources. Add documents, rules, and notes
-						to feed the AI assistant.
+						Manage your game master resources. Upload PDFs or text files to
+						generate AI-powered indices, character sheet templates, and quick
+						references.
 					</p>
 				</div>
-				<GlassButton variant="secondary" size="sm" className="hidden sm:flex">
-					<SFIcon icon={Database} className="mr-2 h-4 w-4" />
-					View All Data
-				</GlassButton>
 			</div>
 
 			{/* Main Grid */}
@@ -268,8 +255,7 @@ const KnowledgePage = () => {
 							<span className="font-medium text-foreground">
 								PDF, TXT, MD, CSV
 							</span>
-							. The file will be processed locally and added to the vector
-							database.
+							.
 						</p>
 
 						<div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -375,7 +361,7 @@ const KnowledgePage = () => {
 			{/* Sources List */}
 			<div className="mt-10">
 				<h3 className="text-lg font-semibold mb-4 px-1">Sources</h3>
-				<div className="rounded-3xl border border-white/20 bg-white/30 dark:bg-white/5 backdrop-blur-md overflow-hidden">
+				<div className="space-y-4">
 					{listQuery.isLoading && (
 						<div className="flex items-center justify-center gap-2 p-8 text-muted-foreground">
 							<Loader2 className="h-5 w-5 animate-spin" />
@@ -384,14 +370,14 @@ const KnowledgePage = () => {
 					)}
 
 					{listQuery.isError && (
-						<div className="flex items-center gap-3 p-6 text-destructive">
+						<div className="flex items-center gap-3 p-6 text-destructive bg-destructive/5 rounded-lg">
 							<AlertCircle className="h-5 w-5 shrink-0" />
 							<p className="text-sm">Failed to load knowledge sources.</p>
 						</div>
 					)}
 
 					{listQuery.isSuccess && listQuery.data.items.length === 0 && (
-						<div className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
+						<div className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground bg-white/5 rounded-lg border border-dashed border-white/10">
 							<Database className="h-8 w-8 opacity-40" />
 							<p className="text-sm font-medium">No sources yet</p>
 							<p className="text-xs opacity-70">
@@ -401,42 +387,53 @@ const KnowledgePage = () => {
 					)}
 
 					{listQuery.isSuccess && listQuery.data.items.length > 0 && (
-						<div className="grid grid-cols-1 divide-y divide-white/10">
+						<div className="grid grid-cols-1 gap-4">
 							{listQuery.data.items.map((item) => (
-								<div
+								<GlassCard
 									key={item.id}
-									className="group flex flex-col p-4 hover:bg-white/40 dark:hover:bg-white/10 transition-colors cursor-default"
+									className="group relative overflow-hidden transition-all hover:shadow-md"
 								>
-									<div className="flex items-start justify-between w-full">
-										<div className="flex items-start gap-4">
-											<div className="h-10 w-10 rounded-lg bg-white/60 dark:bg-white/10 flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors mt-1">
-												<SFIcon icon={FileText} className="h-5 w-5" />
+									<div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+										{/* Icon & Main Info */}
+										<div className="flex items-start gap-4 w-full">
+											<div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+												<SFIcon icon={FileText} className="h-6 w-6" />
 											</div>
-											<div>
-												<p className="font-medium break-all">{item.filename}</p>
-												<p className="text-xs text-muted-foreground mt-0.5">
-													{item.source} •{" "}
-													<span>
-														{item.chunk_count}{" "}
-														{item.chunk_count === 1 ? "chunk" : "chunks"}
+
+											<div className="flex-1 min-w-0">
+												<div className="flex items-center justify-between mb-1">
+													<h4 className="font-semibold text-lg truncate pr-2">
+														{item.filename}
+													</h4>
+													{/* Status Badge (Mobile) */}
+													<span
+														className={cn(
+															"sm:hidden inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border",
+															getStatusColor(item.status),
+														)}
+													>
+														{item.status}
 													</span>
+												</div>
+
+												<p className="text-xs text-muted-foreground truncate mb-3">
+													{item.source}
 												</p>
 
-												{/* Features Pills */}
-												<div className="flex flex-wrap gap-2 mt-2">
-													{item.features.map((feature) => (
-														<span
-															key={feature}
-															className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary uppercase tracking-wider"
-														>
-															{feature}
+												<div className="flex flex-wrap gap-2 mb-2">
+													{item.features && item.features.length > 0 ? (
+														item.features.map(renderFeatureBadge)
+													) : (
+														<span className="text-xs text-muted-foreground italic">
+															No features extracted
 														</span>
-													))}
+													)}
 												</div>
 											</div>
 										</div>
 
-										<div className="flex flex-col items-end gap-2">
+										{/* Status & Actions (Desktop) */}
+										<div className="hidden sm:flex flex-col items-end gap-2 shrink-0">
 											<div className="flex items-center gap-2">
 												{/* Delete Button */}
 												<div
@@ -469,31 +466,30 @@ const KnowledgePage = () => {
 													className="opacity-0 group-hover:opacity-100 transition-opacity"
 													title="Refresh source"
 												>
-													<GlassButton
-														size="sm"
-														variant="ghost"
-														className="h-8 w-8"
-														onClick={(e) => {
-															e.stopPropagation();
-															refreshMutation.mutate(item.id);
-														}}
-														disabled={
-															refreshMutation.isPending ||
-															["running", "pending"].includes(item.status)
-														}
-													>
-														<RefreshCw
-															className={cn(
-																"h-4 w-4",
-																refreshMutation.isPending &&
-																	refreshMutation.variables === item.id &&
-																	"animate-spin text-primary",
-															)}
-														/>
-													</GlassButton>
-												</div>
+												<GlassButton
+													size="icon"
+													variant="ghost"
+													className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+													onClick={(e) => {
+														e.stopPropagation();
+														refreshMutation.mutate(item.id);
+													}}
+													disabled={
+														refreshMutation.isPending ||
+														["running", "pending"].includes(item.status)
+													}
+													title="Refresh Analysis"
+												>
+													<RefreshCw
+														className={cn(
+															"h-4 w-4",
+															refreshMutation.isPending &&
+																refreshMutation.variables === item.id &&
+																"animate-spin text-primary",
+														)}
+													/>
+												</GlassButton>
 
-												{/* Status Badge */}
 												<span
 													className={cn(
 														"inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border",
@@ -507,31 +503,21 @@ const KnowledgePage = () => {
 														item.status.slice(1)}
 												</span>
 											</div>
-
-											<p className="text-[10px] text-muted-foreground text-right">
-												Updated: {formatDate(item.last_indexed_at)}
-											</p>
+											<span className="text-xs text-muted-foreground">
+												{item.chunk_count} chunks • Updated{" "}
+												{formatDate(item.last_indexed_at)}
+											</span>
 										</div>
 									</div>
 
-									{/* Progress Bar & Details */}
+									{/* Progress Bar */}
 									{["running", "pending"].includes(item.status) && (
-										<div className="mt-4 pl-14 pr-2">
-											<div className="flex justify-between text-xs text-muted-foreground mb-1">
-												<span className="truncate max-w-[200px]">
+										<div className="mt-4 bg-muted/30 rounded-lg p-3">
+											<div className="flex justify-between text-xs text-muted-foreground mb-2">
+												<span className="font-medium text-foreground">
 													{item.current_step || "Initializing..."}
 												</span>
-												<div className="flex gap-2">
-													{item.status === "running" && (
-														<span className="font-medium text-primary">
-															{getEstimatedTimeRemaining(
-																item.started_at,
-																item.progress,
-															)}
-														</span>
-													)}
-													<span>{Math.round(item.progress)}%</span>
-												</div>
+												<span>{Math.round(item.progress)}%</span>
 											</div>
 											<div className="h-1.5 w-full rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
 												<div
@@ -544,12 +530,12 @@ const KnowledgePage = () => {
 
 									{/* Error Message */}
 									{item.status === "failed" && item.error_message && (
-										<div className="mt-3 ml-14 rounded-md bg-destructive/10 p-3 text-xs text-destructive">
+										<div className="mt-3 rounded-md bg-destructive/10 p-3 text-xs text-destructive">
 											<p className="font-semibold mb-0.5">Processing Failed</p>
 											<p>{item.error_message}</p>
 										</div>
 									)}
-								</div>
+								</GlassCard>
 							))}
 						</div>
 					)}

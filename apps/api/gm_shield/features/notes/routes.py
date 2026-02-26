@@ -1,184 +1,59 @@
 """
-FastAPI routes for the Notes feature slice.
-
-Exposes CRUD endpoints for user-authored notes under the API v1 namespace.
+Notes feature — API router.
 """
 
-from fastapi import APIRouter, Depends, Response, status
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from gm_shield.features.notes.models import (
-    NoteCreateRequest,
-    NoteFolderCreateRequest,
-    NoteFolderListResponse,
-    NoteFolderResponse,
-    NoteInlineSuggestionRequest,
-    NoteInlineSuggestionResponse,
-    NoteLinkSuggestionRequest,
-    NoteLinkSuggestionResponse,
-    NoteListResponse,
-    NoteResponse,
-    NoteTransformRequest,
-    NoteTransformResponse,
-    NoteUpdateRequest,
-)
+from gm_shield.core.logging import get_logger
 from gm_shield.features.notes import service
+from gm_shield.features.notes.schemas import NoteCreate, NoteResponse, NoteUpdate
 from gm_shield.shared.database.sqlite import get_db
 
+logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.get(
-    "/folders",
-    response_model=NoteFolderListResponse,
-    summary="List note folders",
-    description="Returns all folders/notebooks for note organisation.",
-    responses={200: {"description": "Folders retrieved successfully."}},
-)
-def list_note_folders_endpoint(db: Session = Depends(get_db)) -> NoteFolderListResponse:
-    """Return all note folders."""
-    return NoteFolderListResponse(items=service.list_folders(db))
+@router.post("/", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
+def create_note(note: NoteCreate, db: Session = Depends(get_db)):
+    """Create a new note."""
+    return service.create_note(db, note)
 
 
-@router.post(
-    "/folders",
-    response_model=NoteFolderResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create note folder",
-    description="Creates a folder/notebook for organizing notes.",
-    responses={
-        201: {"description": "Folder created successfully."},
-        404: {"description": "Parent folder not found."},
-    },
-)
-def create_note_folder_endpoint(
-    payload: NoteFolderCreateRequest,
-    db: Session = Depends(get_db),
-) -> NoteFolderResponse:
-    """Create and return a note folder."""
-    return service.create_folder(db, payload)
+@router.get("/", response_model=List[NoteResponse])
+def list_notes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """List all notes."""
+    return service.list_notes(db, skip, limit)
 
 
-@router.get(
-    "",
-    response_model=NoteListResponse,
-    summary="List notes",
-    description="Returns all notes ordered by last update timestamp.",
-    responses={200: {"description": "Notes retrieved successfully."}},
-)
-def list_notes_endpoint(db: Session = Depends(get_db)) -> NoteListResponse:
-    """Return all saved notes."""
-    return NoteListResponse(items=service.list_notes(db))
+@router.get("/{note_id}", response_model=NoteResponse)
+def get_note(note_id: int, db: Session = Depends(get_db)):
+    """Get a specific note by ID."""
+    note = service.get_note(db, note_id)
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return note
 
 
-@router.post(
-    "",
-    response_model=NoteResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create note",
-    description="Creates a new markdown note with optional frontmatter and tags.",
-    responses={201: {"description": "Note created successfully."}},
-)
-def create_note_endpoint(
-    payload: NoteCreateRequest, db: Session = Depends(get_db)
-) -> NoteResponse:
-    """Create and return a note."""
-    return service.create_note(db, payload)
+@router.put("/{note_id}", response_model=NoteResponse)
+async def update_note(
+    note_id: int, note_update: NoteUpdate, db: Session = Depends(get_db)
+):
+    """
+    Update a note.
+    Triggers background auto-tagging if content changes.
+    """
+    note = await service.update_note(db, note_id, note_update)
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return note
 
 
-@router.get(
-    "/{note_id}",
-    response_model=NoteResponse,
-    summary="Get note",
-    description="Returns a single note by its identifier.",
-    responses={
-        200: {"description": "Note retrieved successfully."},
-        404: {"description": "Note not found."},
-    },
-)
-def get_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> NoteResponse:
-    """Fetch one note by ID."""
-    return service.get_note(db, note_id)
-
-
-@router.put(
-    "/{note_id}",
-    response_model=NoteResponse,
-    summary="Update note",
-    description="Replaces an existing note and updates its modification timestamp.",
-    responses={
-        200: {"description": "Note updated successfully."},
-        404: {"description": "Note not found."},
-    },
-)
-def update_note_endpoint(
-    note_id: int,
-    payload: NoteUpdateRequest,
-    db: Session = Depends(get_db),
-) -> NoteResponse:
-    """Update and return a note."""
-    return service.update_note(db, note_id, payload)
-
-
-@router.delete(
-    "/{note_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete note",
-    description="Deletes a note by identifier.",
-    responses={
-        204: {"description": "Note deleted successfully."},
-        404: {"description": "Note not found."},
-    },
-)
-def delete_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> Response:
-    """Delete a note and return an empty response."""
-    service.delete_note(db, note_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.post(
-    "/inline-suggest",
-    response_model=NoteInlineSuggestionResponse,
-    summary="Suggest inline continuation",
-    description="Generates lightweight ghost-text suggestions for in-editor phrase boundaries.",
-    responses={200: {"description": "Inline suggestion generated."}},
-)
-def inline_suggest_endpoint(
-    payload: NoteInlineSuggestionRequest,
-) -> NoteInlineSuggestionResponse:
-    """Generate an inline ghost-text suggestion from draft content."""
-    return service.suggest_inline_text(payload)
-
-
-@router.post(
-    "/transform/preview",
-    response_model=NoteTransformResponse,
-    summary="Preview note transformation",
-    description="Returns a non-destructive preview for a context action on selected text.",
-    responses={
-        200: {"description": "Transformation preview generated."},
-        422: {"description": "Unsupported action."},
-    },
-)
-def preview_transform_endpoint(payload: NoteTransformRequest) -> NoteTransformResponse:
-    """Return a context-menu transformation preview."""
-    return service.preview_transform(payload)
-
-
-@router.post(
-    "/{note_id}/links/suggest",
-    response_model=NoteLinkSuggestionResponse,
-    summary="Suggest note links",
-    description="Suggests knowledge-source links for a note using semantic and keyword matching.",
-    responses={
-        200: {"description": "Link suggestions generated."},
-        404: {"description": "Note not found."},
-    },
-)
-def suggest_note_links_endpoint(
-    note_id: int,
-    payload: NoteLinkSuggestionRequest,
-    db: Session = Depends(get_db),
-) -> NoteLinkSuggestionResponse:
-    """Generate source-link suggestions for a note."""
-    return service.suggest_note_links(db, note_id, payload)
+@router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_note(note_id: int, db: Session = Depends(get_db)):
+    """Delete a note."""
+    success = service.delete_note(db, note_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Note not found")

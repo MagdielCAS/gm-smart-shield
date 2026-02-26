@@ -24,16 +24,6 @@ GM Smart Shield turns your rulebooks, campaign supplements, and homebrew PDFs in
 | [📦 Product Documentation](docs/PRODUCT.md) | Features, user stories, roadmap, design principles |
 | [🏗️ Technical Documentation](docs/TECHNICAL.md) | Architecture, tech stack, data models, API design, Mermaid diagrams |
 
-## Notes API (current pre-alpha surface)
-
-- `GET /api/v1/notes`, `POST /api/v1/notes`, `GET|PUT|DELETE /api/v1/notes/{id}`
-- `POST /api/v1/notes/{id}/links/suggest` for suggested source-link candidates
-- `POST /api/v1/notes/inline-suggest` for phrase-boundary ghost text
-- `POST /api/v1/notes/transform/preview` for context-menu action previews
-
-The notes workflow supports create → edit/update → deterministic tag extraction
-plus structured source-link association in one pass.
-
 ---
 
 ## Quick Start
