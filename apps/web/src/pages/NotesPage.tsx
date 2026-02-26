@@ -1,11 +1,38 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, NotebookPen, Save, Tag } from "lucide-react";
-import { Fragment, type ReactNode, useMemo, useState } from "react";
-import { createNote, listNotes, type Note, updateNote } from "@/api/notes";
+import { Loader2, NotebookPen, Save, Sparkles, Tag } from "lucide-react";
+import {
+	Fragment,
+	type KeyboardEvent,
+	type MouseEvent,
+	type ReactNode,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import {
+	createNote,
+	listNotes,
+	type Note,
+	previewNoteTransform,
+	suggestInlineText,
+	type TransformAction,
+	type TransformPreview,
+	updateNote,
+} from "@/api/notes";
 import { GlassButton } from "@/components/ui/GlassButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 
 const NOTES_QUERY_KEY = ["notes"] as const;
+const PHRASE_BOUNDARY_REGEX = /[.!?;:]$/;
+
+const CONTEXT_ACTIONS: Array<{ label: string; action: TransformAction }> = [
+	{ label: "Rewrite", action: "rewrite" },
+	{ label: "Format", action: "format" },
+	{ label: "Make it dramatic", action: "make_dramatic" },
+	{ label: "Generate content", action: "generate_content" },
+	{ label: "Add reference link", action: "add_reference_link" },
+	{ label: "Search reference link", action: "search_reference_link" },
+];
 
 function parseInlineMarkdown(text: string): ReactNode[] {
 	const tokens = text
@@ -40,7 +67,6 @@ function parseInlineMarkdown(text: string): ReactNode[] {
 
 function renderMarkdown(value: string) {
 	const lines = value.split("\n");
-
 	let offset = 0;
 
 	return lines.map((line) => {
@@ -86,12 +112,29 @@ function formatDate(value: string) {
 	}).format(new Date(value));
 }
 
+function applyPreview(content: string, preview: TransformPreview): string {
+	if (preview.mode === "insert") {
+		return `${content.slice(0, preview.selection_end)}${preview.preview_text}${content.slice(preview.selection_end)}`;
+	}
+	return `${content.slice(0, preview.selection_start)}${preview.preview_text}${content.slice(preview.selection_end)}`;
+}
+
 export default function NotesPage() {
 	const queryClient = useQueryClient();
+	const debounceRef = useRef<number | null>(null);
 	const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
 	const [draftTitle, setDraftTitle] = useState("Untitled note");
 	const [draftContent, setDraftContent] = useState("# Session notes\n");
 	const [saveError, setSaveError] = useState<string | null>(null);
+	const [ghostText, setGhostText] = useState("");
+	const [preview, setPreview] = useState<TransformPreview | null>(null);
+	const [previewError, setPreviewError] = useState<string | null>(null);
+	const [menuState, setMenuState] = useState<{
+		x: number;
+		y: number;
+		start: number;
+		end: number;
+	} | null>(null);
 
 	const notesQuery = useQuery({
 		queryKey: NOTES_QUERY_KEY,
@@ -123,17 +166,72 @@ export default function NotesPage() {
 		},
 	});
 
+	const inlineMutation = useMutation({
+		mutationFn: suggestInlineText,
+		onSuccess: (data) => {
+			setGhostText(data.suggestion);
+		},
+		onError: () => {
+			setGhostText("");
+		},
+	});
+
+	const transformMutation = useMutation({
+		mutationFn: previewNoteTransform,
+		onSuccess: (data) => {
+			setPreview(data);
+			setPreviewError(null);
+			setMenuState(null);
+		},
+		onError: (error: Error) => {
+			setPreviewError(error.message);
+		},
+	});
+
 	const notes = notesQuery.data ?? [];
 	const selectedNote = useMemo(
 		() => notes.find((note) => note.id === selectedNoteId) ?? null,
 		[notes, selectedNoteId],
 	);
 
+	const requestSuggestion = (content: string, cursorIndex: number) => {
+		inlineMutation.mutate({ content, cursor_index: cursorIndex });
+	};
+
+	const handleDraftChange = (value: string, cursorIndex: number) => {
+		setDraftContent(value);
+		setGhostText("");
+		if (debounceRef.current) {
+			window.clearTimeout(debounceRef.current);
+		}
+		const lastChar = value.slice(0, cursorIndex).slice(-1);
+		if (lastChar === "\n" || PHRASE_BOUNDARY_REGEX.test(lastChar)) {
+			requestSuggestion(value, cursorIndex);
+			return;
+		}
+		debounceRef.current = window.setTimeout(() => {
+			requestSuggestion(value, cursorIndex);
+		}, 800);
+	};
+
+	const handleTabAccept = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+		if (event.key !== "Tab" || !ghostText) {
+			return;
+		}
+		event.preventDefault();
+		const target = event.currentTarget;
+		const nextValue = `${draftContent.slice(0, target.selectionStart)}${ghostText}${draftContent.slice(target.selectionEnd)}`;
+		setDraftContent(nextValue);
+		setGhostText("");
+	};
+
 	const selectNote = (note: Note) => {
 		setSelectedNoteId(note.id);
 		setDraftTitle(note.title);
 		setDraftContent(note.content);
 		setSaveError(null);
+		setGhostText("");
+		setPreview(null);
 	};
 
 	const createNewDraft = () => {
@@ -141,6 +239,31 @@ export default function NotesPage() {
 		setDraftTitle("Untitled note");
 		setDraftContent("# Session notes\n");
 		setSaveError(null);
+		setGhostText("");
+		setPreview(null);
+	};
+
+	const openContextMenu = (event: MouseEvent<HTMLTextAreaElement>) => {
+		event.preventDefault();
+		const textarea = event.currentTarget;
+		setMenuState({
+			x: event.clientX,
+			y: event.clientY,
+			start: textarea.selectionStart,
+			end: textarea.selectionEnd,
+		});
+	};
+
+	const runAction = (action: TransformAction) => {
+		if (!menuState) {
+			return;
+		}
+		transformMutation.mutate({
+			action,
+			content: draftContent,
+			selection_start: menuState.start,
+			selection_end: menuState.end,
+		});
 	};
 
 	return (
@@ -194,7 +317,7 @@ export default function NotesPage() {
 					)}
 				</GlassCard>
 
-				<GlassCard className="space-y-3 p-4">
+				<GlassCard className="relative space-y-3 p-4">
 					<div className="space-y-1">
 						<label
 							htmlFor="note-title"
@@ -220,10 +343,68 @@ export default function NotesPage() {
 							id="note-markdown"
 							rows={18}
 							value={draftContent}
-							onChange={(event) => setDraftContent(event.target.value)}
+							onChange={(event) =>
+								handleDraftChange(
+									event.target.value,
+									event.target.selectionStart,
+								)
+							}
+							onKeyDown={handleTabAccept}
+							onContextMenu={openContextMenu}
 							className="w-full rounded-lg border border-white/30 bg-white/70 px-3 py-2 text-sm outline-none ring-primary/40 focus:ring dark:border-white/10 dark:bg-white/10"
 						/>
+						{ghostText ? (
+							<p className="text-xs text-muted-foreground">
+								<Sparkles className="mr-1 inline h-3 w-3" />
+								Ghost suggestion: <span className="font-mono">{ghostText}</span>{" "}
+								(Tab to accept)
+							</p>
+						) : null}
 					</div>
+					{menuState ? (
+						<div
+							className="fixed z-50 w-52 rounded-lg border border-white/30 bg-background/95 p-1 shadow-xl"
+							style={{ left: menuState.x, top: menuState.y }}
+						>
+							{CONTEXT_ACTIONS.map((item) => (
+								<button
+									key={item.action}
+									type="button"
+									className="w-full rounded px-2 py-1 text-left text-sm hover:bg-accent"
+									onClick={() => runAction(item.action)}
+								>
+									{item.label}
+								</button>
+							))}
+						</div>
+					) : null}
+					{preview ? (
+						<div className="space-y-2 rounded-lg border border-white/30 bg-white/60 p-3 text-xs dark:border-white/10 dark:bg-white/5">
+							<p className="font-medium">Preview: {preview.action}</p>
+							<p className="text-muted-foreground">{preview.preview_text}</p>
+							<div className="flex gap-2">
+								<GlassButton
+									type="button"
+									variant="secondary"
+									onClick={() => setPreview(null)}
+								>
+									Dismiss
+								</GlassButton>
+								<GlassButton
+									type="button"
+									onClick={() => {
+										setDraftContent(applyPreview(draftContent, preview));
+										setPreview(null);
+									}}
+								>
+									Apply to draft
+								</GlassButton>
+							</div>
+						</div>
+					) : null}
+					{previewError ? (
+						<p className="text-xs text-red-500">{previewError}</p>
+					) : null}
 					<div className="flex items-center gap-3">
 						<GlassButton
 							onClick={() => saveMutation.mutate()}
