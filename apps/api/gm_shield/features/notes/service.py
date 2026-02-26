@@ -611,4 +611,3 @@ def delete_note(db: Session, note_id: int) -> None:
 
     db.delete(note)
     db.commit()
-

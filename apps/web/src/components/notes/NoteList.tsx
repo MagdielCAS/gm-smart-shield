@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import { type Note } from "../../lib/api/notes";
+import type { Note } from "../../lib/api/notes";
 import { cn } from "../../lib/utils";
 import { GlassButton } from "../ui/GlassButton";
 import { GlassCard } from "../ui/GlassCard";

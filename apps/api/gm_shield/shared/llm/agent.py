@@ -81,4 +81,3 @@ class BaseAgent:
                 "agent_stream_failed", agent=self.__class__.__name__, error=str(e)
             )
             raise
-x
