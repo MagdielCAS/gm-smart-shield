@@ -93,4 +93,118 @@ describe("NotesPage", () => {
 			expect(screen.getByText("session")).toBeInTheDocument();
 		});
 	});
+
+	it("preserves metadata and links when updating an existing note", async () => {
+		mockFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					items: [
+						{
+							id: 2,
+							title: "Investigation",
+							content: "Initial content",
+							frontmatter: { location: "Dock Ward" },
+							metadata: {},
+							folder_id: 7,
+							created_at: "2026-01-01T10:00:00Z",
+							updated_at: "2026-01-01T10:00:00Z",
+							tags: ["mystery"],
+							links: [
+								{
+									source_id: "gazetteer",
+									source_file: "/world/dock-ward.md",
+									page_number: null,
+									chunk_id: "dock_ward_1",
+								},
+							],
+						},
+					],
+				}),
+			} as Response)
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					id: 2,
+					title: "Investigation",
+					content: "Updated content",
+					frontmatter: { location: "Dock Ward" },
+					metadata: {},
+					folder_id: 7,
+					created_at: "2026-01-01T10:00:00Z",
+					updated_at: "2026-01-02T10:00:00Z",
+					tags: ["mystery"],
+					links: [
+						{
+							source_id: "gazetteer",
+							source_file: "/world/dock-ward.md",
+							page_number: null,
+							chunk_id: "dock_ward_1",
+						},
+					],
+				}),
+			} as Response)
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					items: [
+						{
+							id: 2,
+							title: "Investigation",
+							content: "Updated content",
+							frontmatter: { location: "Dock Ward" },
+							metadata: {},
+							folder_id: 7,
+							created_at: "2026-01-01T10:00:00Z",
+							updated_at: "2026-01-02T10:00:00Z",
+							tags: ["mystery"],
+							links: [
+								{
+									source_id: "gazetteer",
+									source_file: "/world/dock-ward.md",
+									page_number: null,
+									chunk_id: "dock_ward_1",
+								},
+							],
+						},
+					],
+				}),
+			} as Response);
+
+		render(<NotesPage />, { wrapper });
+
+		await waitFor(() => {
+			expect(screen.getByText("Investigation")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByText("Investigation"));
+		fireEvent.change(screen.getByLabelText("Markdown"), {
+			target: { value: "Updated content" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+
+		await waitFor(() => {
+			expect(mockFetch).toHaveBeenCalledWith(
+				"/api/v1/notes/2",
+				expect.objectContaining({
+					method: "PUT",
+					body: JSON.stringify({
+						title: "Investigation",
+						content: "Updated content",
+						folder_id: 7,
+						frontmatter: { location: "Dock Ward" },
+						tags: ["mystery"],
+						sources: [
+							{
+								source_id: "gazetteer",
+								source_file: "/world/dock-ward.md",
+								page_number: null,
+								chunk_id: "dock_ward_1",
+							},
+						],
+					}),
+				}),
+			);
+		});
+	});
 });
