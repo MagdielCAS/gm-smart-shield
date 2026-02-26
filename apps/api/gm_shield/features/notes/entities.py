@@ -1,8 +1,8 @@
 """
 SQLAlchemy entities for the Notes feature slice.
 
-Defines relational models for notes, note tags, and structured links back to
-knowledge-source chunks for bidirectional navigation.
+Defines relational models for notes and note tags, including optional link
+metadata that can reference extracted sources and page numbers.
 """
 
 from datetime import datetime, timezone

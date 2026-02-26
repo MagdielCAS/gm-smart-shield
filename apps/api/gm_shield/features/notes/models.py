@@ -12,8 +12,13 @@ from pydantic import BaseModel, Field
 
 
 class NoteLinkMetadata(BaseModel):
-    """Link metadata describing where a note reference came from."""
+    """Link metadata describing where a tagged note reference came from."""
 
+    tag: str = Field(
+        ...,
+        description="Tag associated with the note link.",
+        examples=["npc"],
+    )
     source_id: str | None = Field(
         default=None,
         description="Optional knowledge/source identifier this tag originated from.",

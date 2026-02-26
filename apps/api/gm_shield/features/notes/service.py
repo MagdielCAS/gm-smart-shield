@@ -309,7 +309,16 @@ def _assign_links(note: Note, links: list[NoteLinkMetadata]) -> None:
 
 
 def create_note(db: Session, payload: NoteCreateRequest) -> NoteResponse:
-    """Create and persist a new note."""
+    """
+    Create and persist a new note.
+
+    Args:
+        db: Active SQLAlchemy session.
+        payload: Incoming note creation payload.
+
+    Returns:
+        Created note as a response schema.
+    """
     inferred_tags, extracted_metadata, normalized_content = _run_note_enrichment(payload.content, payload.tags)
 
     frontmatter = payload.frontmatter.copy() if payload.frontmatter else {}
@@ -336,13 +345,33 @@ def create_note(db: Session, payload: NoteCreateRequest) -> NoteResponse:
 
 
 def list_notes(db: Session) -> list[NoteResponse]:
-    """List all notes sorted by newest update first."""
+    """
+    List all notes sorted by newest update first.
+
+    Args:
+        db: Active SQLAlchemy session.
+
+    Returns:
+        Ordered list of note response objects.
+    """
     notes = db.query(Note).order_by(Note.updated_at.desc(), Note.id.desc()).all()
     return [_to_response(note) for note in notes]
 
 
 def get_note(db: Session, note_id: int) -> NoteResponse:
-    """Retrieve a note by ID."""
+    """
+    Retrieve a note by ID.
+
+    Args:
+        db: Active SQLAlchemy session.
+        note_id: Note identifier.
+
+    Returns:
+        Retrieved note schema.
+
+    Raises:
+        HTTPException: If no note exists for ``note_id``.
+    """
     note = db.get(Note, note_id)
     if note is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
@@ -350,7 +379,20 @@ def get_note(db: Session, note_id: int) -> NoteResponse:
 
 
 def update_note(db: Session, note_id: int, payload: NoteUpdateRequest) -> NoteResponse:
-    """Replace an existing note and bump the ``updated_at`` timestamp."""
+    """
+    Replace an existing note and bump the ``updated_at`` timestamp.
+
+    Args:
+        db: Active SQLAlchemy session.
+        note_id: Note identifier.
+        payload: Replacement note payload.
+
+    Returns:
+        Updated note schema.
+
+    Raises:
+        HTTPException: If no note exists for ``note_id``.
+    """
     note = db.get(Note, note_id)
     if note is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
