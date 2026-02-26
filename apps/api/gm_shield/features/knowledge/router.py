@@ -147,3 +147,20 @@ async def knowledge_stats():
     """Return aggregate statistics for the ChromaDB knowledge base collection."""
     stats = await get_knowledge_stats()
     return KnowledgeStatsResponse(**stats)
+
+
+@router.get(
+    "/search",
+    summary="Search the knowledge base",
+    description="Semantically searches the knowledge base for relevant chunks.",
+    tags=["Knowledge", "MCP"],
+)
+async def search_knowledge_endpoint(query: str, top_k: int = 5):
+    """
+    Search the knowledge base for a query.
+    Exposed as an MCP tool by fastapi-mcp automatically.
+    """
+    from gm_shield.features.knowledge.service import query_knowledge
+
+    results = await query_knowledge(query, top_k=top_k)
+    return results

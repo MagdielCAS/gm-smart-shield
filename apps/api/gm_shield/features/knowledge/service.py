@@ -428,3 +428,65 @@ def refresh_knowledge_source(source_id: int) -> None:
         db.commit()
     finally:
         db.close()
+    items = await get_knowledge_list()
+    return {
+        "document_count": len(items),
+        "chunk_count": sum(i["chunk_count"] for i in items),
+    }
+
+
+# ── Semantic Search ───────────────────────────────────────────────────────────
+
+
+def _query_knowledge_sync(query: str, top_k: int = 5) -> list[dict]:
+    """
+    Search ChromaDB for chunks semantically similar to the target query (blocking).
+
+    Returns a list of dicts, each containing:
+    - ``content``: The text content of the chunk.
+    - ``metadata``: Source metadata (e.g. file path).
+    - ``score``: Similarity distance (lower is better for L2).
+    """
+    logger.info("knowledge_query_started", query=query, top_k=top_k)
+
+    # 1. Embed the query
+    model = get_embedding_model()
+    query_embedding = model.encode([query])
+
+    # 2. Query ChromaDB
+    client = get_chroma_client()
+    try:
+        collection = client.get_collection(name="knowledge_base")
+    except ValueError:
+        return []
+
+    results = collection.query(
+        query_embeddings=query_embedding.tolist(),
+        n_results=top_k,
+        include=["documents", "metadatas", "distances"],
+    )
+
+    # 3. Format results
+    formatted = []
+    documents = results.get("documents", [[]])[0]
+    metadatas = results.get("metadatas", [[]])[0]
+    distances = results.get("distances", [[]])[0]
+
+    for i in range(len(documents)):
+        formatted.append(
+            {
+                "content": documents[i],
+                "metadata": metadatas[i],
+                "score": distances[i],
+            }
+        )
+
+    return formatted
+
+
+async def query_knowledge(query: str, top_k: int = 5) -> list[dict]:
+    """
+    Async wrapper for semantic search in the knowledge base.
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _query_knowledge_sync, query, top_k)

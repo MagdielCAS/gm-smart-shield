@@ -13,6 +13,8 @@ from gm_shield.core.logging import configure_logging, get_logger
 from gm_shield.shared.database.sqlite import engine, Base
 from gm_shield.features.health import routes as health_routes
 from gm_shield.features.knowledge import router as knowledge_router_module
+from gm_shield.features.chat import router as chat_router_module
+from gm_shield.shared.ai.mcp import setup_mcp
 from gm_shield.core.telemetry import setup_telemetry
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -86,6 +88,9 @@ app = FastAPI(
 # Setup optional OpenTelemetry + Prometheus metrics (controlled by ENABLE_METRICS env var)
 setup_telemetry(app)
 
+# Setup MCP server
+setup_mcp(app)
+
 
 @app.get(
     "/health",
@@ -132,4 +137,10 @@ app.include_router(
     knowledge_router_module.router,
     prefix=f"{settings.API_V1_STR}/knowledge",
     tags=["Knowledge"],
+)
+
+app.include_router(
+    chat_router_module.router,
+    prefix=f"{settings.API_V1_STR}/chat",
+    tags=["Chat"],
 )
