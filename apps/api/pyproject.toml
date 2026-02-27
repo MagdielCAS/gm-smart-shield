@@ -25,6 +25,8 @@ dependencies = [
     "langchain>=0.3.0",
     "langchain-ollama>=0.2.0",
     "fastapi-mcp>=0.1.0",
+    "ollama>=0.3.0",
+    "PyYAML>=6.0.0",
 ]
 
 [dependency-groups]

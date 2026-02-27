@@ -428,11 +428,10 @@ def refresh_knowledge_source(source_id: int) -> None:
         db.commit()
     finally:
         db.close()
-    items = await get_knowledge_list()
-    return {
-        "document_count": len(items),
-        "chunk_count": sum(i["chunk_count"] for i in items),
-    }
+
+    # We do NOT return the list here anymore to avoid async issues in synchronous context
+    # The router handles the response which doesn't require this return value
+    return None
 
 
 # ── Semantic Search ───────────────────────────────────────────────────────────

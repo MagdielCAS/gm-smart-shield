@@ -14,6 +14,10 @@ from gm_shield.shared.database.sqlite import engine, Base
 from gm_shield.features.health import routes as health_routes
 from gm_shield.features.knowledge import router as knowledge_router_module
 from gm_shield.features.chat import router as chat_router_module
+from gm_shield.features.sheets import router as sheet_router_module
+from gm_shield.features.references import router as reference_router_module
+from gm_shield.features.encounters import router as encounter_router_module
+from gm_shield.features.notes import router as note_router_module
 from gm_shield.shared.ai.mcp import setup_mcp
 from gm_shield.core.telemetry import setup_telemetry
 
@@ -29,6 +33,11 @@ _DESCRIPTION = """
 ## Features (v0.1)
 
 - **Knowledge Base** — ingest PDF, Markdown, text, and CSV files into a vector store for semantic search.
+- **Chat** — Q&A against the knowledge base.
+- **Sheets** — Generate character sheet templates from rulebooks.
+- **References** — Generate quick reference cards.
+- **Encounters** — Create encounters with NPCs.
+- **Notes** — Auto-tag campaign notes.
 - **Health** — check the status of all infrastructure dependencies (SQLite, ChromaDB, Ollama).
 
 ## Local-first design
@@ -43,6 +52,26 @@ _TAGS_METADATA = [
         "description": "Upload and manage knowledge sources. "
         "Files are processed asynchronously: text is extracted, chunked, embedded, "
         "and stored in ChromaDB.",
+    },
+    {
+        "name": "Chat",
+        "description": "Q&A against the knowledge base.",
+    },
+    {
+        "name": "Sheets",
+        "description": "Character sheet template generation.",
+    },
+    {
+        "name": "References",
+        "description": "Quick reference card generation.",
+    },
+    {
+        "name": "Encounters",
+        "description": "Creative encounter generation.",
+    },
+    {
+        "name": "Notes",
+        "description": "Note management and auto-tagging.",
     },
     {
         "name": "Health",
@@ -143,4 +172,28 @@ app.include_router(
     chat_router_module.router,
     prefix=f"{settings.API_V1_STR}/chat",
     tags=["Chat"],
+)
+
+app.include_router(
+    sheet_router_module.router,
+    prefix=f"{settings.API_V1_STR}/sheets",
+    tags=["Sheets"],
+)
+
+app.include_router(
+    reference_router_module.router,
+    prefix=f"{settings.API_V1_STR}/references",
+    tags=["References"],
+)
+
+app.include_router(
+    encounter_router_module.router,
+    prefix=f"{settings.API_V1_STR}/encounters",
+    tags=["Encounters"],
+)
+
+app.include_router(
+    note_router_module.router,
+    prefix=f"{settings.API_V1_STR}/notes",
+    tags=["Notes"],
 )
