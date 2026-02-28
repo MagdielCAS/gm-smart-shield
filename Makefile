@@ -1,4 +1,4 @@
-.PHONY: help setup api-setup web-setup dev dev-api dev-electron run-api web-dev test api-test web-test web-test-e2e web-test-bdd lint api-lint web-lint lint-fix api-lint-fix web-lint-fix format api-format web-format web-build docker-up docker-down docker-logs docker-build
+.PHONY: help setup api-setup web-setup dev dev-api dev-electron run-api web-dev test api-test web-test api-test-staged web-test-staged web-test-e2e web-test-bdd lint api-lint web-lint lint-fix api-lint-fix web-lint-fix format api-format web-format web-build docker-up docker-down docker-logs docker-build
 
 help: ## Show this help message
 	@echo "Available commands:"
@@ -48,6 +48,14 @@ api-test: ## Run API tests
 web-test: ## Run Web unit tests
 	@echo "Running Web unit tests..."
 	cd apps/web && pnpm test
+
+api-test-staged: ## Run API tests (triggered only when .py files are staged)
+	@echo "Running API tests (staged)..."
+	cd apps/api && uv run python -m pytest
+
+web-test-staged: ## Run Web tests related to staged files
+	@echo "Running Web tests related to staged files..."
+	cd apps/web && pnpm vitest run
 
 web-test-e2e: ## Run Web E2E tests
 	@echo "Running Web E2E tests..."
