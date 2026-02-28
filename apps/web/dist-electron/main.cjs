@@ -52,6 +52,17 @@ electron_1.app.whenReady().then(() => {
             return result.filePaths[0];
         }
     });
+    electron_1.ipcMain.handle('dialog:openDirectory', async () => {
+        const result = await electron_1.dialog.showOpenDialog({
+            properties: ['openDirectory'],
+        });
+        if (result.canceled) {
+            return null;
+        }
+        else {
+            return result.filePaths[0];
+        }
+    });
     createWindow();
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0) {

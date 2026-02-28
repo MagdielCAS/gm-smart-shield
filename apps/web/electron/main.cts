@@ -50,6 +50,18 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle('dialog:openDirectory', async () => {
+    const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+    });
+
+    if (result.canceled) {
+      return null;
+    } else {
+      return result.filePaths[0];
+    }
+  });
+
   createWindow();
 
   app.on('activate', () => {

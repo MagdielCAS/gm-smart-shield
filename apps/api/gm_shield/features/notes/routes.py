@@ -21,8 +21,12 @@ from gm_shield.features.notes.models import (
     NoteTransformRequest,
     NoteTransformResponse,
     NoteUpdateRequest,
+    AppSettingsResponse,
+    AppSettingsUpdateRequest,
+    ObsidianNoteEditRequest,
 )
 from gm_shield.features.notes import service
+from gm_shield.features.notes.git_sync import sync_obsidian_vault
 from gm_shield.shared.database.sqlite import get_db
 
 router = APIRouter()
@@ -114,6 +118,9 @@ def get_note_endpoint(note_id: int, db: Session = Depends(get_db)) -> NoteRespon
 def update_note_endpoint(
     note_id: int,
     payload: NoteUpdateRequest,
+    AppSettingsResponse,
+    AppSettingsUpdateRequest,
+    ObsidianNoteEditRequest,
     db: Session = Depends(get_db),
 ) -> NoteResponse:
     """Update and return a note."""
@@ -182,3 +189,52 @@ def suggest_note_links_endpoint(
 ) -> NoteLinkSuggestionResponse:
     """Generate source-link suggestions for a note."""
     return service.suggest_note_links(db, note_id, payload)
+
+
+@router.get(
+    "/settings",
+    response_model=AppSettingsResponse,
+    summary="Get app settings",
+    description="Returns global app settings like the Obsidian vault path.",
+    responses={200: {"description": "Settings retrieved successfully."}},
+)
+def get_settings_endpoint(db: Session = Depends(get_db)) -> AppSettingsResponse:
+    """Return app settings."""
+    return service.get_app_settings(db)
+
+@router.put(
+    "/settings",
+    response_model=AppSettingsResponse,
+    summary="Update app settings",
+    description="Updates global app settings.",
+    responses={200: {"description": "Settings updated successfully."}},
+)
+def update_settings_endpoint(
+    payload: AppSettingsUpdateRequest,
+    ObsidianNoteEditRequest,
+    db: Session = Depends(get_db),
+) -> AppSettingsResponse:
+    """Update and return app settings."""
+    return service.update_app_settings(db, payload)
+
+
+@router.post(
+    "/sync-vault",
+    summary="Sync Obsidian vault",
+    description="Synchronizes the configured Obsidian vault with the local database.",
+    responses={200: {"description": "Vault synced successfully."}},
+)
+def sync_vault_endpoint(db: Session = Depends(get_db)):
+    """Trigger vault synchronization."""
+    return sync_obsidian_vault(db)
+
+
+@router.post(
+    "/edit-obsidian",
+    summary="Edit an Obsidian note",
+    description="Programmatically edit or create an Obsidian note by filepath relative to the vault.",
+    responses={200: {"description": "File successfully edited."}},
+)
+def edit_obsidian_note_endpoint(payload: ObsidianNoteEditRequest, db: Session = Depends(get_db)):
+    """Edit an Obsidian file directly."""
+    return service.edit_obsidian_note(db, payload)

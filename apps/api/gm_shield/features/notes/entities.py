@@ -94,3 +94,17 @@ class NoteLink(Base):
     chunk_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     note: Mapped[Note] = relationship("Note", back_populates="links")
+
+class AppSettings(Base):
+    """Global application settings, such as Obsidian vault configuration."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )

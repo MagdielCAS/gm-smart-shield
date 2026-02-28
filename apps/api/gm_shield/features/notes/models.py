@@ -284,3 +284,16 @@ class NoteFolderListResponse(BaseModel):
         default_factory=list,
         description="All available note folders.",
     )
+
+class AppSettingsResponse(BaseModel):
+    """API response schema representing app settings."""
+    obsidian_vault_path: str | None = Field(default=None, description="Path to the Obsidian vault.")
+
+class AppSettingsUpdateRequest(BaseModel):
+    """Payload for updating app settings."""
+    obsidian_vault_path: str | None = Field(default=None, description="Path to the Obsidian vault.")
+
+class ObsidianNoteEditRequest(BaseModel):
+    """Payload for editing a note file directly in the Obsidian vault."""
+    filepath: str = Field(..., description="Path to the file relative to the vault root.")
+    content: str = Field(..., description="The full markdown content to save.")

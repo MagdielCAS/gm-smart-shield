@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "chromadb>=0.4.0",
     "fastapi>=0.100.0",
+    "gitpython>=3.1.46",
     "httpx>=0.28.1",
     "langchain-text-splitters>=1.1.1",
     "ollama>=0.4.0",
@@ -19,6 +20,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pypdf>=6.7.3",
     "python-dotenv>=1.0.0",
+    "requests>=2.32.5",
     "sentence-transformers>=5.2.3",
     "sqlalchemy>=2.0.0",
     "structlog>=25.5.0",

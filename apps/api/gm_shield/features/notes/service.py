@@ -6,6 +6,7 @@ flows while keeping route handlers thin and focused on HTTP concerns.
 """
 
 import json
+import os
 import re
 from datetime import datetime, timezone
 from importlib import import_module
@@ -14,7 +15,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from gm_shield.features.notes.entities import Note, NoteFolder, NoteLink, NoteTag
+from gm_shield.features.notes.entities import Note, NoteFolder, NoteLink, NoteTag, AppSettings
 from gm_shield.features.notes.models import (
     NoteCreateRequest,
     NoteFolderCreateRequest,
@@ -30,6 +31,9 @@ from gm_shield.features.notes.models import (
     NoteTransformRequest,
     NoteTransformResponse,
     NoteUpdateRequest,
+    AppSettingsResponse,
+    AppSettingsUpdateRequest,
+    ObsidianNoteEditRequest,
 )
 from gm_shield.shared.database.chroma import get_chroma_client
 
@@ -611,3 +615,48 @@ def delete_note(db: Session, note_id: int) -> None:
 
     db.delete(note)
     db.commit()
+
+
+def get_app_settings(db: Session) -> AppSettingsResponse:
+    """Retrieve app settings."""
+    vault_path_setting = db.get(AppSettings, "obsidian_vault_path")
+    vault_path = vault_path_setting.value if vault_path_setting else None
+    return AppSettingsResponse(obsidian_vault_path=vault_path)
+
+def update_app_settings(db: Session, payload: AppSettingsUpdateRequest) -> AppSettingsResponse:
+    """Update app settings."""
+    if payload.obsidian_vault_path is not None:
+        vault_path_setting = db.get(AppSettings, "obsidian_vault_path")
+        if vault_path_setting:
+            vault_path_setting.value = payload.obsidian_vault_path
+        else:
+            db.add(AppSettings(key="obsidian_vault_path", value=payload.obsidian_vault_path))
+    db.commit()
+    return get_app_settings(db)
+
+
+def edit_obsidian_note(db: Session, payload: ObsidianNoteEditRequest) -> dict:
+    """Edit a specific note file inside the Obsidian vault."""
+    settings = db.get(AppSettings, "obsidian_vault_path")
+    if not settings or not settings.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Obsidian vault path not configured."
+        )
+
+    vault_path = settings.value
+    target_path = os.path.join(vault_path, payload.filepath)
+
+    # Ensure the path is within the vault
+    if not os.path.abspath(target_path).startswith(os.path.abspath(vault_path)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filepath outside vault directory."
+        )
+
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+    with open(target_path, "w", encoding="utf-8") as f:
+        f.write(payload.content)
+
+    return {"status": "success", "filepath": payload.filepath}

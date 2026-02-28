@@ -163,3 +163,36 @@ export async function createNoteFolder(
 	});
 	return parseJsonOrThrow<NoteFolder>(response);
 }
+
+export type AppSettings = {
+	obsidian_vault_path: string | null;
+};
+
+export async function getAppSettings(): Promise<AppSettings> {
+	const response = await fetch("/api/v1/notes/settings");
+	return parseJsonOrThrow<AppSettings>(response);
+}
+
+export async function updateAppSettings(
+	payload: AppSettings,
+): Promise<AppSettings> {
+	const response = await fetch("/api/v1/notes/settings", {
+		method: "PUT",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(payload),
+	});
+	return parseJsonOrThrow<AppSettings>(response);
+}
+
+export async function syncVault(): Promise<{
+	status: string;
+	stats?: any;
+	message?: string;
+}> {
+	const response = await fetch("/api/v1/notes/sync-vault", {
+		method: "POST",
+	});
+	return parseJsonOrThrow<{ status: string; stats?: any; message?: string }>(
+		response,
+	);
+}
