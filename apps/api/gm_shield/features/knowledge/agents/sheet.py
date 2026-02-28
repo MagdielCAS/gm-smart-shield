@@ -1,6 +1,7 @@
 """
 Sheet Agent - Extracts character sheet templates from rulebooks.
 """
+
 from typing import Dict, Any, Optional
 import structlog
 from pydantic import BaseModel, Field
@@ -9,13 +10,20 @@ from gm_shield.shared.llm.client import OllamaClient, Message, Role
 
 logger = structlog.get_logger(__name__)
 
+
 class CharacterSheetSchema(BaseModel):
     """Structured output for character sheet extraction."""
-    system_name: str = Field(description="The name of the RPG system (e.g., 'D&D 5e', 'Pathfinder 2e').")
-    template_name: str = Field(description="A descriptive name for the template (e.g., 'Standard Character Sheet').")
+
+    system_name: str = Field(
+        description="The name of the RPG system (e.g., 'D&D 5e', 'Pathfinder 2e')."
+    )
+    template_name: str = Field(
+        description="A descriptive name for the template (e.g., 'Standard Character Sheet')."
+    )
     sections: Dict[str, Any] = Field(
         description="A dictionary representing the sections of the character sheet (e.g., Attributes, Skills, Equipment). Keys are section names, values are lists of fields or nested structures."
     )
+
 
 class SheetAgent:
     """
@@ -25,9 +33,11 @@ class SheetAgent:
 
     def __init__(self):
         self.client = OllamaClient()
-        self.model = "llama3.2:3b" # Using the fast model for extraction
+        self.model = "llama3.2:3b"  # Using the fast model for extraction
 
-    async def extract_template(self, text_content: str) -> Optional[CharacterSheetSchema]:
+    async def extract_template(
+        self, text_content: str
+    ) -> Optional[CharacterSheetSchema]:
         """
         Analyzes the provided text (rulebook content) and extracts a character sheet structure.
 
@@ -60,7 +70,10 @@ class SheetAgent:
 
         messages = [
             Message(role=Role.SYSTEM, content=system_prompt),
-            Message(role=Role.USER, content=f"Analyze this RPG text and extract the character sheet template:\n\n{truncated_text}")
+            Message(
+                role=Role.USER,
+                content=f"Analyze this RPG text and extract the character sheet template:\n\n{truncated_text}",
+            ),
         ]
 
         try:
@@ -68,8 +81,8 @@ class SheetAgent:
             response = await self.client.generate(
                 model=self.model,
                 messages=messages,
-                format=CharacterSheetSchema.model_json_schema(), # Force structured output
-                stream=False
+                format=CharacterSheetSchema.model_json_schema(),  # Force structured output
+                stream=False,
             )
 
             if not response.message or not response.message.content:
@@ -78,6 +91,7 @@ class SheetAgent:
 
             # Parse the JSON response
             import json
+
             data = json.loads(response.message.content)
             return CharacterSheetSchema(**data)
 

@@ -30,7 +30,9 @@ def patch_session_local(db_session):
 
     # Patch the SessionLocal imported in service.py
     # Since service.py does `from ... import SessionLocal`, we must patch it there.
-    with patch("gm_shield.features.notes.service.SessionLocal", side_effect=TestSession):
+    with patch(
+        "gm_shield.features.notes.service.SessionLocal", side_effect=TestSession
+    ):
         yield
 
 
@@ -70,7 +72,7 @@ def check_tags(client, context, tag):
     # Poll for tags
     time.sleep(0.5)
 
-    for _ in range(10): # Increased retries
+    for _ in range(10):  # Increased retries
         response = client.get(f"/api/v1/notes/{context['note_id']}")
         data = response.json()
         tags = [t["tag"] for t in data["tags"]]

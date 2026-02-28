@@ -1,6 +1,7 @@
 """
 Encounter generation services.
 """
+
 from typing import List, Optional
 import structlog
 from pydantic import BaseModel, Field
@@ -9,8 +10,10 @@ from gm_shield.shared.llm.client import OllamaClient, Message, Role
 
 logger = structlog.get_logger(__name__)
 
+
 class NPCStatBlock(BaseModel):
     """Structured NPC stat block."""
+
     name: str = Field(description="Name of the creature or NPC.")
     creature_type: str = Field(description="Type and size (e.g. Medium Humanoid).")
     cr: str = Field(description="Challenge Rating.")
@@ -19,17 +22,28 @@ class NPCStatBlock(BaseModel):
     speed: str = Field(description="Movement speed.")
     stats: str = Field(description="Ability scores formatted as STR 10 (+0), DEX...")
     actions: List[str] = Field(description="List of action descriptions.")
-    special_abilities: Optional[List[str]] = Field(default=None, description="Passive traits or special abilities.")
+    special_abilities: Optional[List[str]] = Field(
+        default=None, description="Passive traits or special abilities."
+    )
+
 
 class EncounterResponse(BaseModel):
     """
     The structured output of the encounter generation.
     """
+
     title: str = Field(description="A creative title for the encounter.")
-    description: str = Field(description="A vivid narrative description of the scene and setup.")
-    tactics: str = Field(description="Tactical advice for the GM on how the enemies behave.")
-    loot: Optional[str] = Field(default=None, description="Potential rewards or treasure.")
+    description: str = Field(
+        description="A vivid narrative description of the scene and setup."
+    )
+    tactics: str = Field(
+        description="Tactical advice for the GM on how the enemies behave."
+    )
+    loot: Optional[str] = Field(
+        default=None, description="Potential rewards or treasure."
+    )
     npcs: List[NPCStatBlock] = Field(description="List of stat blocks for the enemies.")
+
 
 class EncounterAgent:
     """
@@ -40,13 +54,17 @@ class EncounterAgent:
         self.client = OllamaClient()
         # Using a capable instruct model for creative writing and JSON formatting.
         # Fallback to llama3.2 if gemma3 is not available in a real environment check.
-        self.model = "gemma2:9b" # Or "llama3.1:8b" - using a standard robust model.
+        self.model = "gemma2:9b"  # Or "llama3.1:8b" - using a standard robust model.
 
-    async def generate_encounter(self, level: str, difficulty: str, theme: str) -> Optional[EncounterResponse]:
+    async def generate_encounter(
+        self, level: str, difficulty: str, theme: str
+    ) -> Optional[EncounterResponse]:
         """
         Generates an encounter based on parameters using RAG context if available.
         """
-        rag_context = await self._retrieve_context(f"{theme} {difficulty} monster enemy stat block")
+        rag_context = await self._retrieve_context(
+            f"{theme} {difficulty} monster enemy stat block"
+        )
 
         system_prompt = """
         You are an expert Game Master assistant. Create a tactical RPG encounter based on the user's request.
@@ -74,7 +92,7 @@ class EncounterAgent:
 
         messages = [
             Message(role=Role.SYSTEM, content=system_prompt),
-            Message(role=Role.USER, content=user_message)
+            Message(role=Role.USER, content=user_message),
         ]
 
         try:
@@ -86,7 +104,7 @@ class EncounterAgent:
                 messages=messages,
                 format=EncounterResponse.model_json_schema(),
                 stream=False,
-                options={"temperature": 0.7} # Creative but focused
+                options={"temperature": 0.7},  # Creative but focused
             )
 
             if not response.message or not response.message.content:
@@ -94,11 +112,16 @@ class EncounterAgent:
                 return None
 
             import json
+
             try:
                 data = json.loads(response.message.content)
                 return EncounterResponse(**data)
             except json.JSONDecodeError as e:
-                logger.error("encounter_generation_json_error", error=str(e), content=response.message.content)
+                logger.error(
+                    "encounter_generation_json_error",
+                    error=str(e),
+                    content=response.message.content,
+                )
                 return None
 
         except Exception as e:
@@ -122,8 +145,7 @@ class EncounterAgent:
 
             # Query
             results = collection.query(
-                query_embeddings=query_embedding.tolist(),
-                n_results=3
+                query_embeddings=query_embedding.tolist(), n_results=3
             )
 
             documents = results.get("documents", [])
