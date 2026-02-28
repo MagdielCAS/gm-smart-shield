@@ -25,17 +25,9 @@ def sync_obsidian_vault(db: Session) -> dict:
         logger.info(f"Initializing new git repository at {vault_path}")
         repo = git.Repo.init(vault_path)
 
-    # Check if there are uncommitted changes and commit them if needed to track state
     if repo.is_dirty(untracked_files=True):
         repo.git.add(A=True)
         repo.index.commit("Auto-commit before sync")
-
-    # Simple approach: clear all existing notes and folders and re-ingest
-    # For a real implementation we might want to incrementally sync based on git diffs
-    # but the simplest way to ensure correctness is to just rebuild the tree.
-
-    # We will try a smart sync: Re-syncing every markdown file in the folder
-    # In a full solution, we might want to prune old files, but let's clear existing first for simplicity
 
     db.query(NoteTag).delete()
     db.query(NoteLink).delete()
