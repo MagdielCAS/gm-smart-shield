@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pytest_bdd import given, parsers, scenario, then, when
@@ -16,57 +16,41 @@ def context():
 
 @given("the knowledge base is ready")
 def knowledge_ready(context):
-    # Mock get_embedding_model (Sync)
-    patcher_embed = patch("gm_shield.features.chat.service.get_embedding_model")
-    mock_embed = patcher_embed.start()
-    mock_model = MagicMock()
-    mock_embed.return_value = mock_model
-    # encode returns an object with tolist()
-    mock_array = MagicMock()
-    mock_array.tolist.return_value = [0.1, 0.2]
-    mock_model.encode.return_value = mock_array
+    from contextlib import asynccontextmanager
 
-    # Mock get_chroma_client (Sync)
-    patcher_chroma = patch("gm_shield.features.chat.service.get_chroma_client")
-    mock_chroma = patcher_chroma.start()
-    mock_client = MagicMock()
-    mock_chroma.return_value = mock_client
-    mock_collection = MagicMock()
-    mock_client.get_collection.return_value = mock_collection
+    @asynccontextmanager
+    async def mock_mcp_cm(*args, **kwargs):
+        yield []
 
-    # Mock collection.query
-    mock_collection.query.return_value = {
-        "documents": [["Chunk 1"]],
-        "metadatas": [[{"source": "test.pdf"}]],
-    }
+    # Patch the real load_mcp_tools since it's imported inline in the method
+    patcher_mcp = patch("langchain_mcp_adapters.tools.load_mcp_tools", new=mock_mcp_cm)
+    patcher_mcp.start()
 
-    # Mock OllamaClient via BaseAgent
-    # BaseAgent.stream() calls: `await self.client.generate(..., stream=True)`
-    # which returns an async generator of ChatResponse-like objects.
-    patcher_llm = patch("gm_shield.shared.llm.agent.get_llm_client")
-    mock_llm = patcher_llm.start()
-    mock_llm_client = MagicMock()
-    mock_llm.return_value = mock_llm_client
+    # Mock create_deep_agent
+    patcher_agent = patch("gm_shield.features.chat.service.create_deep_agent")
+    mock_create_agent = patcher_agent.start()
 
-    # generate() must be awaitable AND return an async iterable when stream=True
-    async def async_generate(*args, **kwargs):
-        chunk1 = MagicMock()
-        chunk1.message = MagicMock()
-        chunk1.message.content = "Part 1"
-        chunk2 = MagicMock()
-        chunk2.message = MagicMock()
-        chunk2.message.content = "Part 2"
-        yield chunk1
-        yield chunk2
+    mock_agent = MagicMock()
+    mock_create_agent.return_value = mock_agent
 
-    mock_llm_client.generate = AsyncMock(side_effect=async_generate)
+    # Mock astream_events to yield SSE-like events
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Part 1")},
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Part 2")},
+        }
 
-    context["patchers"] = [patcher_embed, patcher_chroma, patcher_llm]
+    mock_agent.astream_events = mock_astream_events
+
+    context["patchers"] = [patcher_mcp, patcher_agent]
 
 
 @when(parsers.parse('I ask "{question}"'))
 def ask_question(client, context, question):
-    # Using TestClient with stream=True
     response = client.post("/api/v1/chat/query", json={"query": question})
     context["response"] = response
 
@@ -75,11 +59,9 @@ def ask_question(client, context, question):
 def check_stream(context):
     response = context["response"]
     assert response.status_code == 200
-    # Consuming stream content
     content = response.content.decode("utf-8")
     assert "Part 1" in content
     assert "Part 2" in content
 
-    # Cleanup
     for p in context.get("patchers", []):
         p.stop()

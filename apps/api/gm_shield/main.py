@@ -16,6 +16,7 @@ from gm_shield.features.health import routes as health_routes
 from gm_shield.features.knowledge import router as knowledge_router_module
 from gm_shield.features.notes import routes as notes_routes
 from gm_shield.features.encounters import routes as encounter_routes
+from gm_shield.features.mcp import routes as mcp_routes
 from gm_shield.core.telemetry import setup_telemetry
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -170,4 +171,10 @@ app.include_router(
     encounter_routes.router,
     prefix=f"{settings.API_V1_STR}/encounters",
     tags=["Encounters"],
+)
+
+app.include_router(
+    mcp_routes.router,
+    prefix=f"{settings.API_V1_STR}/mcp",
+    tags=["MCP"],
 )

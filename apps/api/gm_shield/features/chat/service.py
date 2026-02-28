@@ -8,83 +8,109 @@ Handles the Query Agent logic:
 4. Streams the response from Ollama.
 """
 
+import sys
 from typing import AsyncGenerator
+from deepagents import create_deep_agent
+from langchain_core.messages import HumanMessage
+from langchain_core.callbacks import AsyncCallbackHandler
 
 from gm_shield.core.logging import get_logger
-from gm_shield.features.knowledge.service import get_embedding_model
-from gm_shield.shared.database.chroma import get_chroma_client
 from gm_shield.shared.llm import config as llm_config
-from gm_shield.shared.llm.agent import BaseAgent
+from gm_shield.shared.llm.subagents import SUBAGENTS
+from langchain_mcp_adapters.tools import load_mcp_tools
 
 logger = get_logger(__name__)
 
-SYSTEM_PROMPT = """You are the GM's intelligent assistant. You answer questions based on the provided context from rulebooks and notes.
-- If the answer is found in the context, be concise and accurate.
-- If the answer is not in the context, say "I don't have that information in my knowledge base."
-- Cite the source file (e.g. "PHB.pdf") if possible based on the context metadata.
+SYSTEM_PROMPT = """You are the GM's intelligent assistant and orchestrator.
+Use the provided tools and delegated subagents to answer questions or perform tasks (like generating encounters, creating notes, or querying the knowledge base).
+- If you need to generate an encounter, use the encounter generator.
+- If you need to search rules or lore, use the knowledge base tool.
+- Always provide concise, helpful answers.
 """
 
 
-class QueryAgent(BaseAgent):
+class QueryAgent:
     """
-    RAG-enabled Query Agent for answering GM questions.
+    Main Orchestrator Agent. Uses deepagents and LangChain to route queries to tools and subagents.
     """
 
     def __init__(self):
-        super().__init__(model=llm_config.MODEL_QUERY, system_prompt=SYSTEM_PROMPT)
-        self.embedding_model = get_embedding_model()
-        # We don't store the collection reference permanently to avoid staleness if re-initialized
-        self.chroma_client = get_chroma_client()
+        self.model = llm_config.MODEL_QUERY
+
+    async def _get_mcp_tools(self):
+        """Fetch tools from the local MCP server via stdio."""
+        from mcp import StdioServerParameters
+
+        server_params = StdioServerParameters(
+            command=sys.executable,
+            args=["-m", "gm_shield.features.mcp.server_stdio"],
+        )
+        # In a real long-running scenario we'd keep the session alive.
+        # For this execution, we'll initialize, get tools, and return them.
+        # However, Langchain MCP adapters handle the lifecycle.
+        return load_mcp_tools([server_params])
 
     async def query(self, user_query: str) -> AsyncGenerator[str, None]:
         """
-        Run the full RAG pipeline and stream the answer.
-
-        Args:
-            user_query: The question from the GM.
-
-        Yields:
-            Chunks of the answer text.
+        Run the agent orchestrator and stream the answer.
         """
-        logger.info("rag_query_start", query=user_query)
+        logger.info("orchestrator_query_start", query=user_query)
 
-        # 1. Embed query (CPU-bound, strictly speaking should be in executor if heavy,
-        # but for single query it's fast enough)
-        query_embedding = self.embedding_model.encode(user_query).tolist()
+        class AsyncIteratorCallbackHandler(AsyncCallbackHandler):
+            def __init__(self):
+                import asyncio
 
-        # 2. Retrieve from ChromaDB
+                self.queue = asyncio.Queue()
+                self.done = False
+
+            async def on_chat_model_start(self, *args, **kwargs):
+                pass
+
+            async def on_llm_new_token(self, token: str, **kwargs) -> None:
+                if token is not None:
+                    self.queue.put_nowait(token)
+
+            async def on_llm_end(self, *args, **kwargs) -> None:
+                self.done = True
+                self.queue.put_nowait(None)
+
+            async def on_llm_error(self, *args, **kwargs) -> None:
+                self.done = True
+                self.queue.put_nowait(None)
+
         try:
-            collection = self.chroma_client.get_collection("knowledge_base")
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=3,  # Retrieve top 3 chunks
-                include=["documents", "metadatas"],
+            # We need to use langchain_mcp_adapters to load tools
+            # Let's import it inline.
+            from langchain_mcp_adapters.tools import load_mcp_tools
+            from mcp import StdioServerParameters
+            import sys
+
+            server_params = StdioServerParameters(
+                command=sys.executable,
+                args=["-m", "gm_shield.features.mcp.server_stdio"],
             )
-            context_chunks = results.get("documents", [[]])[0]
-            metadatas = results.get("metadatas", [[]])[0]
+
+            # Using async with context manager for tools
+            async with load_mcp_tools([server_params]) as mcp_tools:
+                agent = create_deep_agent(
+                    name="QueryOrchestrator",
+                    model=f"ollama:{self.model}",
+                    subagents=SUBAGENTS,
+                    tools=mcp_tools,
+                    system_prompt=SYSTEM_PROMPT,
+                    # deepagents allows callbacks via run_config but we can also just stream
+                )
+
+                # deepagents compiled graphs stream events natively
+                async for event in agent.astream_events(
+                    {"messages": [HumanMessage(content=user_query)]}, version="v1"
+                ):
+                    kind = event["event"]
+                    if kind == "on_chat_model_stream":
+                        chunk = event["data"]["chunk"]
+                        if chunk.content:
+                            yield chunk.content
+
         except Exception as e:
-            # Collection might not exist yet
-            logger.warning("rag_retrieval_failed", error=str(e))
-            context_chunks = []
-            metadatas = []
-
-        if not context_chunks:
-            logger.info("rag_no_context_found")
-            context_str = "No relevant context found in the knowledge base."
-        else:
-            context_str = "\n\n".join(
-                [
-                    f"[Source: {m.get('source', 'Unknown')}]\n{c}"
-                    for c, m in zip(context_chunks, metadatas)
-                ]
-            )
-
-        # 3. Build Prompt
-        full_prompt = f"Context:\n{context_str}\n\nQuestion: {user_query}\nAnswer:"
-
-        logger.info("rag_retrieval_complete", chunk_count=len(context_chunks))
-
-        # 4. Stream Response
-        # We stream directly from the base agent
-        async for chunk in self.stream(prompt=full_prompt):
-            yield chunk
+            logger.error("orchestrator_query_failed", error=str(e))
+            yield "I'm sorry, an error occurred while processing your request."

@@ -7,7 +7,6 @@ import structlog
 from pydantic import BaseModel, Field
 
 from gm_shield.shared.llm import config as llm_config
-from gm_shield.shared.llm.agent import BaseAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -46,13 +45,13 @@ class EncounterResponse(BaseModel):
     npcs: List[NPCStatBlock] = Field(description="List of stat blocks for the enemies.")
 
 
-class EncounterAgent(BaseAgent):
+class EncounterAgent:
     """
     Agent responsible for generating tactical RPG encounters.
     """
 
     def __init__(self):
-        system_prompt = """
+        self.system_prompt = """
         You are an expert Game Master assistant. Create a tactical RPG encounter based on the user's request.
 
         Your output must be a valid JSON object matching the provided schema.
@@ -65,7 +64,6 @@ class EncounterAgent(BaseAgent):
 
         Use the provided context to inspire the creatures, but ensure the encounter is balanced for the requested level and difficulty.
         """
-        super().__init__(model=llm_config.MODEL_ENCOUNTER, system_prompt=system_prompt)
 
     async def generate_encounter(
         self, level: str, difficulty: str, theme: str
@@ -89,31 +87,19 @@ class EncounterAgent(BaseAgent):
 
         try:
             logger.info("encounter_generation_started", level=level, theme=theme)
+            from langchain_ollama import ChatOllama
+            from langchain_core.messages import SystemMessage, HumanMessage
 
-            # We use json mode to ensure structure
-            response = await self.generate(
-                prompt=user_message,
-                format=EncounterResponse.model_json_schema(),
-                stream=False,
-                options={"temperature": 0.7},  # Creative but focused
-            )
+            llm = ChatOllama(model=llm_config.MODEL_ENCOUNTER, temperature=0.7)
+            structured_llm = llm.with_structured_output(EncounterResponse)
 
-            if not response:
-                logger.error("encounter_generation_empty_response")
-                return None
+            messages = [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=user_message),
+            ]
 
-            import json
-
-            try:
-                data = json.loads(response)
-                return EncounterResponse(**data)
-            except json.JSONDecodeError as e:
-                logger.error(
-                    "encounter_generation_json_error",
-                    error=str(e),
-                    content=response,
-                )
-                return None
+            response = await structured_llm.ainvoke(messages)
+            return response
 
         except Exception as e:
             logger.error("encounter_generation_failed", error=str(e))

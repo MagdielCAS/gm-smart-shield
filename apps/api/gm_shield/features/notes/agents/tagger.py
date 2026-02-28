@@ -4,12 +4,11 @@ Notes feature — Tagging Agent.
 Extracts entities and keywords from note content.
 """
 
-import json
 from typing import List
+from pydantic import BaseModel, Field
 
 from gm_shield.core.logging import get_logger
 from gm_shield.shared.llm import config as llm_config
-from gm_shield.shared.llm.agent import BaseAgent
 
 logger = get_logger(__name__)
 
@@ -19,13 +18,17 @@ Example: ["Goblin", "Dark Forest", "Sword of Light"]
 """
 
 
-class TaggingAgent(BaseAgent):
+class TagResponse(BaseModel):
+    tags: List[str] = Field(description="A list of extracted tags.")
+
+
+class TaggingAgent:
     """
     Agent that extracts tags from text.
     """
 
     def __init__(self):
-        super().__init__(model=llm_config.MODEL_TAGGING, system_prompt=SYSTEM_PROMPT)
+        self.system_prompt = SYSTEM_PROMPT
 
     async def extract_tags(self, content: str) -> List[str]:
         """
@@ -41,23 +44,22 @@ class TaggingAgent(BaseAgent):
             return []
 
         try:
-            # We enforce JSON format
-            response = await self.generate(content, format="json")
-            data = json.loads(response)
+            from langchain_ollama import ChatOllama
+            from langchain_core.messages import SystemMessage, HumanMessage
 
-            # Expecting a list directly, or a dict with a list
-            if isinstance(data, list):
-                return [str(tag) for tag in data]
-            elif isinstance(data, dict):
-                # Try to find a list value, or if keys are tags?
-                # Usually with format="json", strict schema is better, but Ollama "json" mode
-                # just enforces valid JSON.
-                # If model outputs {"tags": [...]}, we handle it.
-                for val in data.values():
-                    if isinstance(val, list):
-                        return [str(tag) for tag in val]
+            llm = ChatOllama(model=llm_config.MODEL_TAGGING, temperature=0.1)
+            structured_llm = llm.with_structured_output(TagResponse)
 
+            messages = [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=content),
+            ]
+
+            response = await structured_llm.ainvoke(messages)
+            if response and response.tags:
+                return response.tags
             return []
+
         except Exception as e:
             logger.error("tagging_failed", error=str(e))
             return []

@@ -92,6 +92,7 @@ def verify_sheet_template_content(db_session, sheet_source_id):
         .first()
     )
     assert template.system == "D&D 5e"
+    # template_schema is now a dict
     assert "Attributes" in template.template_schema
 
 
@@ -127,16 +128,21 @@ def run_reference_extraction_task(db_session, ref_source_id, monkeypatch):
     )
 
     mock_agent = AsyncMock()
-    from gm_shield.features.knowledge.agents.reference import ReferenceItem
+    from gm_shield.features.knowledge.agents.reference import (
+        ReferenceList,
+        ReferenceItem,
+    )
 
-    mock_agent.extract_references.return_value = [
-        ReferenceItem(
-            name="Fireball",
-            category="Spell",
-            description="8d6 fire",
-            tags=["Evocation"],
-        )
-    ]
+    mock_agent.extract_references.return_value = ReferenceList(
+        items=[
+            ReferenceItem(
+                name="Fireball",
+                category="Spell",
+                description="8d6 fire",
+                tags=["Evocation"],
+            )
+        ]
+    )
 
     monkeypatch.setattr(
         "gm_shield.features.knowledge.tasks.ReferenceAgent", lambda: mock_agent

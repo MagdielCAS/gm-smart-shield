@@ -7,7 +7,6 @@ import structlog
 from pydantic import BaseModel, Field
 
 from gm_shield.shared.llm import config as llm_config
-from gm_shield.shared.llm.agent import BaseAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -26,14 +25,14 @@ class CharacterSheetSchema(BaseModel):
     )
 
 
-class SheetAgent(BaseAgent):
+class SheetAgent:
     """
     Agent responsible for analyzing rulebook text and extracting a structured
     character sheet template.
     """
 
     def __init__(self):
-        system_prompt = """
+        self.system_prompt = """
         You are an expert RPG system analyst. Your task is to extract the structure of a character sheet from the provided rulebook text.
 
         Identify the core components required to play a character in this system, such as:
@@ -46,7 +45,6 @@ class SheetAgent(BaseAgent):
         Output the result as a JSON object matching the requested schema.
         Ensure the 'sections' field contains a logical grouping of these fields.
         """
-        super().__init__(model=llm_config.MODEL_SHEET, system_prompt=system_prompt)
 
     async def extract_template(
         self, text_content: str
@@ -60,32 +58,28 @@ class SheetAgent(BaseAgent):
         Returns:
             CharacterSheetSchema or None if extraction fails.
         """
-        # Truncate text if too long to avoid context window issues,
-        # specifically targeting sections that might describe character creation.
-        # For a robust solution, we might want to RAG this first, but for now
-        # we'll take a significant chunk.
+        # Truncate text if too long to avoid context window issues
         max_chars = 12000
         truncated_text = text_content[:max_chars]
 
         prompt = f"Analyze this RPG text and extract the character sheet template:\n\n{truncated_text}"
 
         try:
-            logger.info("sheet_agent_extraction_started", model=self.model)
-            response = await self.generate(
-                prompt=prompt,
-                format=CharacterSheetSchema.model_json_schema(),  # Force structured output
-                stream=False,
-            )
+            logger.info("sheet_agent_extraction_started", model=llm_config.MODEL_SHEET)
 
-            if not response:
-                logger.error("sheet_agent_empty_response")
-                return None
+            from langchain_ollama import ChatOllama
+            from langchain_core.messages import SystemMessage, HumanMessage
 
-            # Parse the JSON response
-            import json
+            llm = ChatOllama(model=llm_config.MODEL_SHEET, temperature=0.1)
+            structured_llm = llm.with_structured_output(CharacterSheetSchema)
 
-            data = json.loads(response)
-            return CharacterSheetSchema(**data)
+            messages = [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=prompt),
+            ]
+
+            response = await structured_llm.ainvoke(messages)
+            return response
 
         except Exception as e:
             logger.error("sheet_agent_extraction_failed", error=str(e))
