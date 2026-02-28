@@ -20,3 +20,9 @@ Feature: Knowledge Base Status and Refresh
     When I request to refresh knowledge source 1
     Then the response status code should be 202
     And the response should indicate that refresh has started
+
+  Scenario: Delete a knowledge source
+    Given I have an existing knowledge source with ID 2
+    When I request to delete knowledge source 2
+    Then the response status code should be 204
+    And the knowledge source should no longer exist in the list

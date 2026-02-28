@@ -428,3 +428,43 @@ def refresh_knowledge_source(source_id: int) -> None:
         db.commit()
     finally:
         db.close()
+
+
+def delete_knowledge_source(source_id: int) -> None:
+    """
+    Delete a knowledge source record and its associated chunks from ChromaDB.
+    """
+    db = SessionLocal()
+    try:
+        source = (
+            db.query(KnowledgeSource).filter(KnowledgeSource.id == source_id).first()
+        )
+        if not source:
+            raise ValueError(f"Source {source_id} not found")
+
+        file_path = source.file_path
+
+        # 1. Delete from ChromaDB
+        try:
+            client = get_chroma_client()
+            collection = client.get_or_create_collection(name="knowledge_base")
+            existing_chunks = collection.get(where={"source": file_path}, include=[])
+            existing_ids = existing_chunks.get("ids", [])
+            if existing_ids:
+                collection.delete(ids=existing_ids)
+        except Exception as e:
+            logger.error(
+                "knowledge_source_chromadb_deletion_failed",
+                source_id=source_id,
+                error=str(e),
+            )
+            # We continue with SQLite deletion even if ChromaDB fails
+
+        # 2. Delete from SQLite
+        db.delete(source)
+        db.commit()
+        logger.info(
+            "knowledge_source_deleted", source_id=source_id, file_path=file_path
+        )
+    finally:
+        db.close()

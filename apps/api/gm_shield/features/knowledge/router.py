@@ -23,6 +23,7 @@ from gm_shield.features.knowledge.service import (
     get_knowledge_stats,
     process_knowledge_source,
     refresh_knowledge_source,
+    delete_knowledge_source,
 )
 from gm_shield.shared.worker.memory import get_task_queue
 
@@ -147,3 +148,19 @@ async def knowledge_stats():
     """Return aggregate statistics for the ChromaDB knowledge base collection."""
     stats = await get_knowledge_stats()
     return KnowledgeStatsResponse(**stats)
+
+
+@router.delete(
+    "/{source_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a knowledge source",
+    description="Deletes a knowledge source completely, including its vector embeddings in ChromaDB.",
+)
+async def remove_knowledge_source(source_id: int):
+    """
+    Remove a knowledge source from the database and vector store.
+    """
+    try:
+        await asyncio.to_thread(delete_knowledge_source, source_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

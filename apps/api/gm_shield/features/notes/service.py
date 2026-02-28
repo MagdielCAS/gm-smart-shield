@@ -571,16 +571,18 @@ def suggest_note_links(
     )
 
 
-
-
 def _to_folder_response(folder: NoteFolder) -> NoteFolderResponse:
     """Convert a ``NoteFolder`` ORM entity to API schema."""
-    return NoteFolderResponse(id=folder.id, name=folder.name, parent_id=folder.parent_id)
+    return NoteFolderResponse(
+        id=folder.id, name=folder.name, parent_id=folder.parent_id
+    )
 
 
 def list_folders(db: Session) -> list[NoteFolderResponse]:
     """Return all note folders ordered by name then ID."""
-    folders = db.query(NoteFolder).order_by(NoteFolder.name.asc(), NoteFolder.id.asc()).all()
+    folders = (
+        db.query(NoteFolder).order_by(NoteFolder.name.asc(), NoteFolder.id.asc()).all()
+    )
     return [_to_folder_response(folder) for folder in folders]
 
 

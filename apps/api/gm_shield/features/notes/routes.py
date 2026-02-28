@@ -28,8 +28,6 @@ from gm_shield.shared.database.sqlite import get_db
 router = APIRouter()
 
 
-
-
 @router.get(
     "/folders",
     response_model=NoteFolderListResponse,
@@ -59,6 +57,7 @@ def create_note_folder_endpoint(
 ) -> NoteFolderResponse:
     """Create and return a note folder."""
     return service.create_folder(db, payload)
+
 
 @router.get(
     "",

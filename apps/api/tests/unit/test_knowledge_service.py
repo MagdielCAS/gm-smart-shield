@@ -9,7 +9,10 @@ Tests the `process_knowledge_source` async pipeline, ensuring that:
 
 import pytest
 from unittest.mock import MagicMock, patch
-from gm_shield.features.knowledge.service import process_knowledge_source
+from gm_shield.features.knowledge.service import (
+    process_knowledge_source,
+    delete_knowledge_source,
+)
 
 
 # ── Fixtures & Mocks ──────────────────────────────────────────────────────────
@@ -203,3 +206,36 @@ async def test_process_knowledge_source_does_not_delete_on_add_failure(
     collection.delete.assert_not_called()
     assert source_record.status == "failed"
     assert "Transient Chroma error" in source_record.error_message
+
+
+# ── delete_knowledge_source ──────────────────────────────────────────────────
+
+
+def test_delete_knowledge_source_success(mock_db_session, mock_external_services):
+    """It deletes records from SQLite and ChromaDB."""
+    source_record = MagicMock()
+    source_record.id = 1
+    source_record.file_path = "/docs/to_delete.pdf"
+    mock_db_session.query.return_value.filter.return_value.first.return_value = (
+        source_record
+    )
+
+    collection = mock_external_services["collection"]
+    collection.get.return_value = {"ids": ["chunk_1", "chunk_2"]}
+
+    delete_knowledge_source(1)
+
+    collection.get.assert_called_once_with(
+        where={"source": "/docs/to_delete.pdf"}, include=[]
+    )
+    collection.delete.assert_called_once_with(ids=["chunk_1", "chunk_2"])
+    mock_db_session.delete.assert_called_once_with(source_record)
+    mock_db_session.commit.assert_called_once()
+
+
+def test_delete_knowledge_source_not_found(mock_db_session):
+    """It raises ValueError if the source doesn't exist."""
+    mock_db_session.query.return_value.filter.return_value.first.return_value = None
+
+    with pytest.raises(ValueError, match="Source 999 not found"):
+        delete_knowledge_source(999)

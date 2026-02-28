@@ -6,6 +6,7 @@ import {
 	FileText,
 	Loader2,
 	RefreshCw,
+	Trash2,
 	UploadCloud,
 } from "lucide-react";
 import { useState } from "react";
@@ -134,6 +135,32 @@ const KnowledgePage = () => {
 			queryClient.invalidateQueries({ queryKey: ["knowledge"] });
 		},
 	});
+
+	const deleteMutation = useMutation<void, Error, number>({
+		mutationFn: async (sourceId) => {
+			const response = await fetch(`${API_BASE_URL}/v1/knowledge/${sourceId}`, {
+				method: "DELETE",
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.detail || "Failed to delete source");
+			}
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["knowledge"] });
+		},
+	});
+
+	const handleDelete = (sourceId: number, filename: string) => {
+		if (
+			window.confirm(
+				`Are you sure you want to completely remove "${filename}" and its vector data?`,
+			)
+		) {
+			deleteMutation.mutate(sourceId);
+		}
+	};
 
 	const handleSelectFile = async () => {
 		if (!window.electron) {
@@ -411,6 +438,32 @@ const KnowledgePage = () => {
 
 										<div className="flex flex-col items-end gap-2">
 											<div className="flex items-center gap-2">
+												{/* Delete Button */}
+												<div
+													className="opacity-0 group-hover:opacity-100 transition-opacity"
+													title="Delete source"
+												>
+													<GlassButton
+														size="sm"
+														variant="ghost"
+														className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+														onClick={(e) => {
+															e.stopPropagation();
+															handleDelete(item.id, item.filename);
+														}}
+														disabled={deleteMutation.isPending}
+													>
+														<Trash2
+															className={cn(
+																"h-4 w-4",
+																deleteMutation.isPending &&
+																	deleteMutation.variables === item.id &&
+																	"animate-spin",
+															)}
+														/>
+													</GlassButton>
+												</div>
+
 												{/* Refresh Button */}
 												<div
 													className="opacity-0 group-hover:opacity-100 transition-opacity"

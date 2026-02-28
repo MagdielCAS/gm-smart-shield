@@ -97,6 +97,7 @@ def ensure_source_id(client, context, source_id):
 
     if existing:
         context["source_id"] = existing["id"]
+        context["file_path"] = file_path
     else:
         # Create it
         client.post("/api/v1/knowledge/", json={"file_path": file_path})
@@ -105,6 +106,22 @@ def ensure_source_id(client, context, source_id):
         items = list_resp.json()["items"]
         new_item = next((i for i in items if i["source"] == file_path), None)
         context["source_id"] = new_item["id"]
+        context["file_path"] = file_path
+
+
+@when(parsers.parse("I request to delete knowledge source {source_id:d}"))
+def delete_source(client, context, source_id):
+    real_id = context.get("source_id", source_id)
+    context["response"] = client.delete(f"/api/v1/knowledge/{real_id}")
+
+
+@then("the knowledge source should no longer exist in the list")
+def check_source_deleted(client, context):
+    file_path = context.get("file_path")
+    list_resp = client.get("/api/v1/knowledge/")
+    items = list_resp.json().get("items", [])
+    exists = any(i["source"] == file_path for i in items)
+    assert not exists, f"Source {file_path} still exists in the list."
 
 
 @when(parsers.parse("I request to refresh knowledge source {source_id:d}"))
