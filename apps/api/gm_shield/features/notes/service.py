@@ -28,12 +28,17 @@ def list_notes(db: Session, skip: int = 0, limit: int = 100) -> List[Note]:
     )
 
 
-def create_note(db: Session, note: NoteCreate) -> Note:
+async def create_note(db: Session, note: NoteCreate) -> Note:
     """Create a new note."""
     db_note = Note(title=note.title, content=note.content)
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
+
+    if note.content:
+        queue = get_task_queue()
+        await queue.enqueue(run_auto_tagging, db_note.id)
+
     return db_note
 
 

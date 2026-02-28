@@ -6,6 +6,8 @@ import EncountersPage from "./pages/EncountersPage";
 import { Home } from "./pages/Home";
 import KnowledgePage from "./pages/KnowledgePage";
 import NotesPage from "./pages/NotesPage";
+import ReferencesPage from "./pages/ReferencesPage";
+import SheetsPage from "./pages/SheetsPage";
 
 const queryClient = new QueryClient();
 const Router =
@@ -22,6 +24,8 @@ function App() {
 						<Route path="chat" element={<ChatPage />} />
 						<Route path="notes" element={<NotesPage />} />
 						<Route path="encounters" element={<EncountersPage />} />
+						<Route path="references" element={<ReferencesPage />} />
+						<Route path="sheets" element={<SheetsPage />} />
 					</Route>
 				</Routes>
 			</Router>

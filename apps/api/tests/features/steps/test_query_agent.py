@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pytest_bdd import given, parsers, scenario, then, when
@@ -40,18 +40,26 @@ def knowledge_ready(context):
         "metadatas": [[{"source": "test.pdf"}]],
     }
 
-    # Mock OllamaClient via BaseAgent (Sync getter, async methods)
+    # Mock OllamaClient via BaseAgent
+    # BaseAgent.stream() calls: `await self.client.generate(..., stream=True)`
+    # which returns an async generator of ChatResponse-like objects.
     patcher_llm = patch("gm_shield.shared.llm.agent.get_llm_client")
     mock_llm = patcher_llm.start()
     mock_llm_client = MagicMock()
     mock_llm.return_value = mock_llm_client
 
-    # Mock stream generator
-    async def async_gen(*args, **kwargs):
-        yield "Part 1"
-        yield "Part 2"
+    # generate() must be awaitable AND return an async iterable when stream=True
+    async def async_generate(*args, **kwargs):
+        chunk1 = MagicMock()
+        chunk1.message = MagicMock()
+        chunk1.message.content = "Part 1"
+        chunk2 = MagicMock()
+        chunk2.message = MagicMock()
+        chunk2.message.content = "Part 2"
+        yield chunk1
+        yield chunk2
 
-    mock_llm_client.stream.side_effect = async_gen
+    mock_llm_client.generate = AsyncMock(side_effect=async_generate)
 
     context["patchers"] = [patcher_embed, patcher_chroma, patcher_llm]
 

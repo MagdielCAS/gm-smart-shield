@@ -17,9 +17,9 @@ router = APIRouter()
 
 
 @router.post("/", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
-def create_note(note: NoteCreate, db: Session = Depends(get_db)):
+async def create_note(note: NoteCreate, db: Session = Depends(get_db)):
     """Create a new note."""
-    return service.create_note(db, note)
+    return await service.create_note(db, note)
 
 
 @router.get("/", response_model=List[NoteResponse])
