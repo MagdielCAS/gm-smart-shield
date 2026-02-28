@@ -55,19 +55,19 @@ When("I navigate to the knowledge page", async ({ page }) => {
 
 Then("I should see a list of knowledge sources", async ({ page }) => {
     // Check for the mock item - target the filename specifically to avoid ambiguity
-    await expect(page.locator("p.font-medium", { hasText: "rulebook.pdf" })).toBeVisible();
+    await expect(page.locator("h4", { hasText: "rulebook.pdf" })).toBeVisible();
 });
 
-Then("I should see status badges for each source \\(e.g., {string}, {string}\\)", async ({ page }, s1, s2) => {
-    // We check if we see "Completed" which corresponds to our mock
-    await expect(page.getByText(s1)).toBeVisible();
+Then("I should see status badges for each source \\(e.g., {string}, {string}\\)", async ({ page }, s1, _s2) => {
+    // Check if we see the status badge which corresponds to our mock (ignore case)
+    await expect(page.locator("span", { hasText: new RegExp(s1, "i") }).locator("visible=true").first()).toBeVisible();
 });
 
 // Ingest a new file and see progress
 Given("I have selected a file {string}", async ({ page }, filePath) => {
     // Mock the file selection logic.
     await page.addInitScript((path) => {
-        (window as any).electron = {
+        (window as Window & typeof globalThis & { electron?: { openFile: () => Promise<string> } }).electron = {
             openFile: () => Promise.resolve(path),
         };
     }, filePath);
@@ -125,10 +125,10 @@ When("I click the \"Add Source\" button", async ({ page }) => {
     await page.locator("text=Select File").click({ force: true });
 });
 
-Then("I should see the new source appear in the list with status {string} or {string}", async ({ page }, s1, s2) => {
+Then("I should see the new source appear in the list with status {string} or {string}", async ({ page }, _s1, s2) => {
     // Wait for the list to refresh (polling)
-    await expect(page.locator("p.font-medium", { hasText: "new_monster.md" })).toBeVisible();
-    await expect(page.getByText(s2)).toBeVisible(); // "Running"
+    await expect(page.locator("h4", { hasText: "new_monster.md" })).toBeVisible();
+    await expect(page.locator("span", { hasText: new RegExp(s2, "i") }).locator("visible=true").first()).toBeVisible(); // "Running"
 });
 
 Then("I should see a progress bar for the running task", async ({ page }) => {
@@ -177,7 +177,7 @@ Given("I have a {string} knowledge source in the list", async ({ page }, status)
     });
 
     await page.goto("/knowledge");
-    await expect(page.getByText(status)).toBeVisible();
+    await expect(page.locator("span", { hasText: new RegExp(status, "i") }).locator("visible=true").first()).toBeVisible();
 });
 
 When("I click the \"Refresh\" button for that source", async ({ page }) => {
@@ -228,8 +228,8 @@ When("I click the \"Refresh\" button for that source", async ({ page }) => {
     await page.getByTitle("Refresh source").first().click({ force: true });
 });
 
-Then("the status badge should change to {string} or {string}", async ({ page }, s1, s2) => {
-    await expect(page.getByText(s2)).toBeVisible();
+Then("the status badge should change to {string} or {string}", async ({ page }, _s1, s2) => {
+    await expect(page.locator("span", { hasText: new RegExp(s2, "i") }).locator("visible=true").first()).toBeVisible();
 });
 
 Then("I should see a loading spinner or progress indicator", async ({ page }) => {
