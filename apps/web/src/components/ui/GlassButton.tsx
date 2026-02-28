@@ -4,7 +4,7 @@ import { cn } from "../../lib/utils";
 interface GlassButtonProps
 	extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 	variant?: "primary" | "secondary" | "ghost" | "danger";
-	size?: "sm" | "md" | "lg";
+	size?: "sm" | "md" | "lg" | "icon";
 }
 
 export const GlassButton = React.forwardRef<
@@ -24,6 +24,7 @@ export const GlassButton = React.forwardRef<
 		sm: "h-8 px-3 text-xs rounded-lg",
 		md: "h-10 px-4 py-2 text-sm rounded-xl",
 		lg: "h-12 px-6 text-base rounded-2xl",
+		icon: "h-9 w-9 rounded-xl",
 	};
 
 	return (
