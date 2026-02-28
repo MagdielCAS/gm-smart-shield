@@ -7,7 +7,6 @@ import structlog
 from pydantic import BaseModel, Field
 
 from gm_shield.shared.llm import config as llm_config
-from gm_shield.shared.llm.agent import BaseAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -33,13 +32,13 @@ class ReferenceList(BaseModel):
     items: List[ReferenceItem]
 
 
-class ReferenceAgent(BaseAgent):
+class ReferenceAgent:
     """
     Agent responsible for extracting lists of reference items from text.
     """
 
     def __init__(self):
-        super().__init__(model=llm_config.MODEL_REFERENCE_SMART, system_prompt="")
+        self.model_name = llm_config.MODEL_REFERENCE_SMART
 
     async def extract_references(
         self, text_chunk: str, category_hint: str = "items or spells"
@@ -47,7 +46,7 @@ class ReferenceAgent(BaseAgent):
         """
         Analyzes a chunk of text and extracts structured reference items.
         """
-        self.system_prompt = f"""
+        system_prompt = f"""
         You are an RPG data extractor. Your job is to read the provided text and identify any {category_hint}.
 
         For each item found, extract:
@@ -62,21 +61,23 @@ class ReferenceAgent(BaseAgent):
         prompt = f"Extract {category_hint} from this text:\n\n{text_chunk}"
 
         try:
-            logger.info("reference_extraction_started", model=self.model)
+            logger.info("reference_extraction_started", model=self.model_name)
 
-            response = await self.generate(
-                prompt=prompt,
-                format=ReferenceList.model_json_schema(),
-                stream=False,
-            )
+            from langchain_ollama import ChatOllama
+            from langchain_core.messages import SystemMessage, HumanMessage
 
-            if not response:
-                return []
+            llm = ChatOllama(model=self.model_name, temperature=0.1)
+            structured_llm = llm.with_structured_output(ReferenceList)
 
-            import json
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=prompt),
+            ]
 
-            data = json.loads(response)
-            return ReferenceList(**data).items
+            response = await structured_llm.ainvoke(messages)
+            if response and response.items:
+                return response.items
+            return []
 
         except Exception as e:
             logger.error("reference_extraction_failed", error=str(e))

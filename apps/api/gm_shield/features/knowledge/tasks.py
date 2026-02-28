@@ -140,7 +140,9 @@ async def run_reference_extraction(source_id: int):
         text_chunk = text[:chunk_size]
 
         agent = ReferenceAgent()
-        items = await agent.extract_references(text_chunk)
+        result = await agent.extract_references(text_chunk)
+
+        items = result.items if result else []
 
         if items:
             logger.info("reference_extraction_success", count=len(items))
