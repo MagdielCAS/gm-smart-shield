@@ -24,8 +24,7 @@ async def test_get_knowledge_list_returns_sources(mock_session_cls):
     # Mock source objects
     s1 = MagicMock()
     s1.id = 1
-    s1.source = "/docs/rulebook.pdf"
-    s1.filename = "rulebook.pdf"
+    s1.file_path = "/docs/rulebook.pdf"
     s1.chunk_count = 10
     s1.status = "completed"
     s1.progress = 100.0
@@ -36,8 +35,7 @@ async def test_get_knowledge_list_returns_sources(mock_session_cls):
 
     s2 = MagicMock()
     s2.id = 2
-    s2.source = "/docs/notes.txt"
-    s2.filename = "notes.txt"
+    s2.file_path = "/docs/notes.txt"
     s2.chunk_count = 5
     s2.status = "running"
     s2.progress = 50.0

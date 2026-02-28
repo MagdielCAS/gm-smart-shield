@@ -24,11 +24,7 @@ def get_note(db: Session, note_id: int) -> Optional[Note]:
 def list_notes(db: Session, skip: int = 0, limit: int = 100) -> List[Note]:
     """List notes, ordered by most recently updated."""
     return (
-        db.query(Note)
-        .order_by(Note.updated_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
+        db.query(Note).order_by(Note.updated_at.desc()).offset(skip).limit(limit).all()
     )
 
 

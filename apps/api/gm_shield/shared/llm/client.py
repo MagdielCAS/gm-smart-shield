@@ -11,15 +11,18 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+
 class Role(str, Enum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
 
+
 class Message(BaseModel):
     role: Role
     content: str
     images: Optional[List[str]] = None
+
 
 class ChatResponse(BaseModel):
     model: str
@@ -30,6 +33,7 @@ class ChatResponse(BaseModel):
     load_duration: Optional[int] = None
     prompt_eval_count: Optional[int] = None
     eval_count: Optional[int] = None
+
 
 class OllamaClient:
     """
@@ -45,8 +49,8 @@ class OllamaClient:
         model: str,
         messages: List[Message],
         stream: bool = False,
-        format: Optional[Union[str, Dict[str, Any]]] = None, # JSON schema or 'json'
-        options: Optional[Dict[str, Any]] = None
+        format: Optional[Union[str, Dict[str, Any]]] = None,  # JSON schema or 'json'
+        options: Optional[Dict[str, Any]] = None,
     ) -> Union[ChatResponse, AsyncGenerator[ChatResponse, None]]:
         """
         Generate a chat completion.
@@ -75,7 +79,9 @@ class OllamaClient:
             logger.error("ollama_request_failed", error=str(e))
             raise
 
-    async def _stream_response(self, payload: Dict[str, Any]) -> AsyncGenerator[ChatResponse, None]:
+    async def _stream_response(
+        self, payload: Dict[str, Any]
+    ) -> AsyncGenerator[ChatResponse, None]:
         async with self.client.stream("POST", "/api/chat", json=payload) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
@@ -103,13 +109,15 @@ class OllamaClient:
         """Pull a model from the library."""
         payload = {"name": model}
         async with self.client.stream("POST", "/api/pull", json=payload) as response:
-             response.raise_for_status()
-             async for line in response.aiter_lines():
+            response.raise_for_status()
+            async for line in response.aiter_lines():
                 if not line:
                     continue
                 yield json.loads(line)
 
+
 _client_instance = None
+
 
 def get_llm_client() -> OllamaClient:
     """Returns a singleton instance of the Ollama client."""

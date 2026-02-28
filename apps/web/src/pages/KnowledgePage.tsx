@@ -466,29 +466,30 @@ const KnowledgePage = () => {
 													className="opacity-0 group-hover:opacity-100 transition-opacity"
 													title="Refresh source"
 												>
-												<GlassButton
-													size="icon"
-													variant="ghost"
-													className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-													onClick={(e) => {
-														e.stopPropagation();
-														refreshMutation.mutate(item.id);
-													}}
-													disabled={
-														refreshMutation.isPending ||
-														["running", "pending"].includes(item.status)
-													}
-													title="Refresh Analysis"
-												>
-													<RefreshCw
-														className={cn(
-															"h-4 w-4",
-															refreshMutation.isPending &&
-																refreshMutation.variables === item.id &&
-																"animate-spin text-primary",
-														)}
-													/>
-												</GlassButton>
+													<GlassButton
+														size="icon"
+														variant="ghost"
+														className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+														onClick={(e) => {
+															e.stopPropagation();
+															refreshMutation.mutate(item.id);
+														}}
+														disabled={
+															refreshMutation.isPending ||
+															["running", "pending"].includes(item.status)
+														}
+														title="Refresh Analysis"
+													>
+														<RefreshCw
+															className={cn(
+																"h-4 w-4",
+																refreshMutation.isPending &&
+																	refreshMutation.variables === item.id &&
+																	"animate-spin text-primary",
+															)}
+														/>
+													</GlassButton>
+												</div>
 
 												<span
 													className={cn(
@@ -504,7 +505,8 @@ const KnowledgePage = () => {
 												</span>
 											</div>
 											<span className="text-xs text-muted-foreground">
-												{item.chunk_count} chunks • Updated{" "}
+												{item.chunk_count}{" "}
+												{item.chunk_count === 1 ? "chunk" : "chunks"} • Updated{" "}
 												{formatDate(item.last_indexed_at)}
 											</span>
 										</div>

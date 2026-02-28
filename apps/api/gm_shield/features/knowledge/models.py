@@ -47,6 +47,7 @@ class QuickReference(Base):
     """
     Extracted reference items (spells, weapons, items, feats) from knowledge sources.
     """
+
     __tablename__ = "quick_references"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -58,7 +59,7 @@ class QuickReference(Base):
     description: Mapped[str] = mapped_column(Text)
 
     # Metadata
-    tags: Mapped[Optional[list]] = mapped_column(JSON) # e.g. ["Fire", "Level 1"]
+    tags: Mapped[Optional[list]] = mapped_column(JSON)  # e.g. ["Fire", "Level 1"]
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
@@ -81,6 +82,7 @@ class CharacterSheetTemplate(Base):
     """
     Extracted character sheet structure from a rulebook.
     """
+
     __tablename__ = "character_sheet_templates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -88,7 +90,7 @@ class CharacterSheetTemplate(Base):
 
     # Metadata
     name: Mapped[str] = mapped_column(String)  # e.g. "D&D 5e Character Sheet"
-    system: Mapped[str] = mapped_column(String) # e.g. "D&D 5e"
+    system: Mapped[str] = mapped_column(String)  # e.g. "D&D 5e"
 
     # The actual schema/template content (YAML or JSON structure)
     template_schema: Mapped[dict] = mapped_column(JSON)

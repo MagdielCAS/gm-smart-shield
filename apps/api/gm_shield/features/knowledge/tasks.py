@@ -3,7 +3,6 @@ Async task registration for Knowledge feature.
 This file handles background processing of uploaded documents (extraction, indexing, etc.).
 """
 
-
 from gm_shield.core.logging import get_logger
 from gm_shield.features.knowledge.service import process_knowledge_source
 from gm_shield.features.knowledge.models import CharacterSheetTemplate, QuickReference
@@ -12,6 +11,7 @@ from gm_shield.features.knowledge.agents.sheet import SheetAgent
 from gm_shield.features.knowledge.agents.reference import ReferenceAgent
 
 logger = get_logger(__name__)
+
 
 async def run_knowledge_ingestion(source_id: int):
     """
@@ -38,7 +38,10 @@ async def run_knowledge_ingestion(source_id: int):
     try:
         await run_reference_extraction(source_id)
     except Exception as e:
-        logger.error("reference_extraction_task_failed", source_id=source_id, error=str(e))
+        logger.error(
+            "reference_extraction_task_failed", source_id=source_id, error=str(e)
+        )
+
 
 async def run_sheet_extraction(source_id: int):
     """
@@ -51,9 +54,17 @@ async def run_sheet_extraction(source_id: int):
 
     session = SessionLocal()
     try:
-        source = session.query(KnowledgeSource).filter(KnowledgeSource.id == source_id).first()
+        source = (
+            session.query(KnowledgeSource)
+            .filter(KnowledgeSource.id == source_id)
+            .first()
+        )
         if not source or source.status != "completed":
-            logger.warning("sheet_extraction_skipped_invalid_source", source_id=source_id, status=getattr(source, "status", "unknown"))
+            logger.warning(
+                "sheet_extraction_skipped_invalid_source",
+                source_id=source_id,
+                status=getattr(source, "status", "unknown"),
+            )
             return
 
         # Extract raw text again (or we could have cached it, but disk is cheap for now)
@@ -67,14 +78,16 @@ async def run_sheet_extraction(source_id: int):
         template_schema = await agent.extract_template(text)
 
         if template_schema:
-            logger.info("sheet_extraction_success", template_name=template_schema.template_name)
+            logger.info(
+                "sheet_extraction_success", template_name=template_schema.template_name
+            )
 
             # Save to DB
             template = CharacterSheetTemplate(
                 source_id=source_id,
                 name=template_schema.template_name,
                 system=template_schema.system_name,
-                template_schema=template_schema.sections
+                template_schema=template_schema.sections,
             )
             session.add(template)
 
@@ -94,6 +107,7 @@ async def run_sheet_extraction(source_id: int):
     finally:
         session.close()
 
+
 async def run_reference_extraction(source_id: int):
     """
     Runs the Reference Agent to extract spells, items, etc.
@@ -107,7 +121,11 @@ async def run_reference_extraction(source_id: int):
 
     session = SessionLocal()
     try:
-        source = session.query(KnowledgeSource).filter(KnowledgeSource.id == source_id).first()
+        source = (
+            session.query(KnowledgeSource)
+            .filter(KnowledgeSource.id == source_id)
+            .first()
+        )
         if not source or source.status != "completed":
             return
 
@@ -132,7 +150,7 @@ async def run_reference_extraction(source_id: int):
                     name=item.name,
                     category=item.category,
                     description=item.description,
-                    tags=item.tags
+                    tags=item.tags,
                 )
                 session.add(ref)
 

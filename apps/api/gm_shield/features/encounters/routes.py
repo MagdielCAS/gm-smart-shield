@@ -1,6 +1,7 @@
 """
 Encounter Generator API Routes.
 """
+
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
@@ -9,10 +10,12 @@ from gm_shield.features.encounters.service import EncounterAgent, EncounterRespo
 
 router = APIRouter(prefix="/encounters", tags=["encounters"])
 
+
 class EncounterRequest(BaseModel):
     level: str
     difficulty: str
     theme: str
+
 
 @router.post("/generate", response_model=EncounterResponse)
 async def generate_encounter(request: EncounterRequest):
@@ -24,21 +27,19 @@ async def generate_encounter(request: EncounterRequest):
 
     try:
         response = await agent.generate_encounter(
-            level=request.level,
-            difficulty=request.difficulty,
-            theme=request.theme
+            level=request.level, difficulty=request.difficulty, theme=request.theme
         )
 
         if not response:
-             raise HTTPException(
+            raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to generate encounter. The LLM response was empty or malformed."
+                detail="Failed to generate encounter. The LLM response was empty or malformed.",
             )
 
         return response
 
     except Exception as e:
-         raise HTTPException(
+        raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Encounter generation error: {str(e)}"
+            detail=f"Encounter generation error: {str(e)}",
         )

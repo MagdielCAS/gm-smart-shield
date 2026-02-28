@@ -323,8 +323,8 @@ def _get_knowledge_list_sync() -> list[dict]:
             results.append(
                 {
                     "id": s.id,
-                    "source": s.source,
-                    "filename": s.filename,
+                    "source": s.file_path,
+                    "filename": Path(s.file_path).name if s.file_path else "",
                     "chunk_count": s.chunk_count,
                     "status": s.status,
                     "progress": s.progress,

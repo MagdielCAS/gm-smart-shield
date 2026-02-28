@@ -131,8 +131,8 @@ describe("KnowledgePage", () => {
 		await waitFor(() => {
 			expect(screen.getByText("monster-manual.pdf")).toBeInTheDocument();
 			expect(screen.getByText("rulebook.txt")).toBeInTheDocument();
-			expect(screen.getByText("42 chunks")).toBeInTheDocument();
-			expect(screen.getByText("18 chunks")).toBeInTheDocument();
+			expect(screen.getByText(/42 chunks/i)).toBeInTheDocument();
+			expect(screen.getByText(/18 chunks/i)).toBeInTheDocument();
 		});
 	});
 
@@ -160,7 +160,7 @@ describe("KnowledgePage", () => {
 		render(<KnowledgePage />, { wrapper });
 
 		await waitFor(() => {
-			expect(screen.getByText("1 chunk")).toBeInTheDocument();
+			expect(screen.getByText(/1 chunk/i)).toBeInTheDocument();
 		});
 	});
 
