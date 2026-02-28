@@ -1,5 +1,7 @@
 import {
+	BookMarked,
 	BookOpen,
+	FileBadge,
 	FileText,
 	Home,
 	MessageSquare,
@@ -30,9 +32,9 @@ export function Layout() {
 		{ href: "/knowledge", label: "Knowledge", icon: BookOpen },
 		{ href: "/notes", label: "Notes", icon: FileText },
 		{ href: "/encounters", label: "Encounters", icon: Swords },
+		{ href: "/references", label: "References", icon: BookMarked },
+		{ href: "/sheets", label: "Sheets", icon: FileBadge },
 		{ href: "/chat", label: "AI Chat", icon: MessageSquare },
-		// Deactivated for now
-		// { href: "/settings", label: "Settings", icon: Settings },
 	];
 
 	return (

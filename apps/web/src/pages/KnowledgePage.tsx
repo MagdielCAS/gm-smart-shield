@@ -13,6 +13,12 @@ import { useState } from "react";
 import { GlassButton } from "../components/ui/GlassButton";
 import { GlassCard } from "../components/ui/GlassCard";
 import { SFIcon } from "../components/ui/SFIcon";
+import {
+	TooltipContent,
+	TooltipProvider,
+	TooltipRoot,
+	TooltipTrigger,
+} from "../components/ui/Tooltip";
 import { API_BASE_URL } from "../config";
 import { cn } from "../lib/utils";
 
@@ -179,6 +185,12 @@ const KnowledgePage = () => {
 		} catch (error) {
 			console.error("Failed to open file:", error);
 		}
+	};
+
+	/** Crop the middle of a long string, keeping `keep` chars from each end. */
+	const truncateMiddle = (str: string, keep = 28) => {
+		if (str.length <= keep * 2 + 3) return str;
+		return `${str.slice(0, keep)}…${str.slice(-keep)}`;
 	};
 
 	const formatDate = (dateString: string | null) => {
@@ -416,9 +428,18 @@ const KnowledgePage = () => {
 													</span>
 												</div>
 
-												<p className="text-xs text-muted-foreground truncate mb-3">
-													{item.source}
-												</p>
+												<TooltipProvider delayDuration={300}>
+													<TooltipRoot>
+														<TooltipTrigger asChild>
+															<p className="text-xs text-muted-foreground font-mono cursor-default mb-3 truncate">
+																{truncateMiddle(item.source)}
+															</p>
+														</TooltipTrigger>
+														<TooltipContent side="bottom">
+															{item.source}
+														</TooltipContent>
+													</TooltipRoot>
+												</TooltipProvider>
 
 												<div className="flex flex-wrap gap-2 mb-2">
 													{item.features && item.features.length > 0 ? (

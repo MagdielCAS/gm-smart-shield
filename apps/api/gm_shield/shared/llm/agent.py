@@ -8,7 +8,7 @@ LLM interaction, and logging.
 from typing import AsyncGenerator
 
 from gm_shield.core.logging import get_logger
-from gm_shield.shared.llm.client import get_llm_client
+from gm_shield.shared.llm.client import Message, Role, get_llm_client
 
 logger = get_logger(__name__)
 
@@ -33,6 +33,14 @@ class BaseAgent:
         self.system_prompt = system_prompt
         self.client = get_llm_client()
 
+    def _build_messages(self, prompt: str) -> list[Message]:
+        """Construct the chat message list from the system prompt and user input."""
+        messages = []
+        if self.system_prompt:
+            messages.append(Message(role=Role.SYSTEM, content=self.system_prompt))
+        messages.append(Message(role=Role.USER, content=prompt))
+        return messages
+
     async def generate(self, prompt: str, **kwargs) -> str:
         """
         Generate a complete response for the given prompt.
@@ -48,9 +56,13 @@ class BaseAgent:
             "agent_generate_start", agent=self.__class__.__name__, model=self.model
         )
         try:
-            return await self.client.generate(
-                prompt=prompt, model=self.model, system=self.system_prompt, **kwargs
+            messages = self._build_messages(prompt)
+            response = await self.client.generate(
+                model=self.model, messages=messages, **kwargs
             )
+            if response.message is None:
+                return ""
+            return response.message.content
         except Exception as e:
             logger.error(
                 "agent_generate_failed", agent=self.__class__.__name__, error=str(e)
@@ -72,10 +84,12 @@ class BaseAgent:
             "agent_stream_start", agent=self.__class__.__name__, model=self.model
         )
         try:
-            async for chunk in self.client.stream(
-                prompt=prompt, model=self.model, system=self.system_prompt, **kwargs
+            messages = self._build_messages(prompt)
+            async for chunk in await self.client.generate(
+                model=self.model, messages=messages, stream=True, **kwargs
             ):
-                yield chunk
+                if chunk.message:
+                    yield chunk.message.content
         except Exception as e:
             logger.error(
                 "agent_stream_failed", agent=self.__class__.__name__, error=str(e)

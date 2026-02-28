@@ -216,3 +216,4 @@ apps/web/dist-app/**
 
 # Node
 **/node_modules
+.magi.yaml

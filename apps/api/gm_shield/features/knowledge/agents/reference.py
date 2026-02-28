@@ -6,7 +6,8 @@ from typing import List
 import structlog
 from pydantic import BaseModel, Field
 
-from gm_shield.shared.llm.client import OllamaClient, Message, Role
+from gm_shield.shared.llm import config as llm_config
+from gm_shield.shared.llm.agent import BaseAgent
 
 logger = structlog.get_logger(__name__)
 
@@ -32,14 +33,13 @@ class ReferenceList(BaseModel):
     items: List[ReferenceItem]
 
 
-class ReferenceAgent:
+class ReferenceAgent(BaseAgent):
     """
     Agent responsible for extracting lists of reference items from text.
     """
 
     def __init__(self):
-        self.client = OllamaClient()
-        self.model = "granite4:latest"  # Using a slightly stronger model for dense extraction if available, else fallback
+        super().__init__(model=llm_config.MODEL_REFERENCE_SMART, system_prompt="")
 
     async def extract_references(
         self, text_chunk: str, category_hint: str = "items or spells"
@@ -47,7 +47,7 @@ class ReferenceAgent:
         """
         Analyzes a chunk of text and extracts structured reference items.
         """
-        system_prompt = f"""
+        self.system_prompt = f"""
         You are an RPG data extractor. Your job is to read the provided text and identify any {category_hint}.
 
         For each item found, extract:
@@ -59,30 +59,23 @@ class ReferenceAgent:
         Return a JSON list of objects. If no items are found, return an empty list.
         """
 
-        messages = [
-            Message(role=Role.SYSTEM, content=system_prompt),
-            Message(
-                role=Role.USER,
-                content=f"Extract {category_hint} from this text:\n\n{text_chunk}",
-            ),
-        ]
+        prompt = f"Extract {category_hint} from this text:\n\n{text_chunk}"
 
         try:
             logger.info("reference_extraction_started", model=self.model)
 
-            response = await self.client.generate(
-                model=self.model,
-                messages=messages,
+            response = await self.generate(
+                prompt=prompt,
                 format=ReferenceList.model_json_schema(),
                 stream=False,
             )
 
-            if not response.message or not response.message.content:
+            if not response:
                 return []
 
             import json
 
-            data = json.loads(response.message.content)
+            data = json.loads(response)
             return ReferenceList(**data).items
 
         except Exception as e:

@@ -21,10 +21,10 @@ from gm_shield.features.knowledge.service import (
     create_or_update_knowledge_source,
     get_knowledge_list,
     get_knowledge_stats,
-    process_knowledge_source,
     refresh_knowledge_source,
     delete_knowledge_source,
 )
+from gm_shield.features.knowledge.tasks import run_knowledge_ingestion
 from gm_shield.shared.worker.memory import get_task_queue
 
 router = APIRouter()
@@ -74,7 +74,7 @@ async def add_knowledge_source(source: KnowledgeSourceCreate):
 
     queue = get_task_queue()
     # Now passing the database ID instead of the file path
-    task_id = await queue.enqueue(process_knowledge_source, source_id)
+    task_id = await queue.enqueue(run_knowledge_ingestion, source_id)
 
     return KnowledgeSourceResponse(
         task_id=task_id,
@@ -101,7 +101,7 @@ async def refresh_source(source_id: int):
         raise HTTPException(status_code=404, detail=str(e))
 
     queue = get_task_queue()
-    task_id = await queue.enqueue(process_knowledge_source, source_id)
+    task_id = await queue.enqueue(run_knowledge_ingestion, source_id)
 
     return KnowledgeSourceResponse(
         task_id=task_id,

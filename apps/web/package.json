@@ -25,6 +25,7 @@
 		"electron:pack": "pnpm build && pnpm electron:build && electron-builder"
 	},
 	"dependencies": {
+		"@radix-ui/react-tooltip": "^1.2.8",
 		"@tanstack/react-query": "^5.90.21",
 		"clsx": "^2.1.1",
 		"lucide-react": "^0.575.0",
