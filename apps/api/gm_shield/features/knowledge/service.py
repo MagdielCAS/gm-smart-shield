@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-from pypdf import PdfReader
+from langchain_opendataloader_pdf import OpenDataLoaderPDFLoader
 from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
 
@@ -70,7 +70,7 @@ def extract_text_from_file(file_path: str) -> str:
         ValueError: If the file extension is not supported.
 
     Supported formats:
-        - ``.pdf`` — extracted page-by-page using PyPDF
+        - ``.pdf`` — extracted page-by-page using OpenDataLoaderPDFLoader
         - ``.txt`` / ``.md`` — read as UTF-8 plain text
         - ``.csv`` — loaded with pandas and serialised to string
     """
@@ -82,12 +82,14 @@ def extract_text_from_file(file_path: str) -> str:
 
     try:
         if ext == ".pdf":
-            reader = PdfReader(file_path)
+            loader = OpenDataLoaderPDFLoader(
+                file_path=file_path,
+                format="markdown",
+            )
+            documents = loader.load()
             text = ""
-            for i, page in enumerate(reader.pages):
-                extracted = page.extract_text()
-                if extracted:
-                    text += f"\n--- Page {i + 1} ---\n{extracted}\n"
+            for i, doc in enumerate(documents):
+                text += f"\n--- Page {i + 1} ---\n{doc.page_content}\n"
             return text
 
         elif ext in [".txt", ".md"]:
@@ -123,11 +125,17 @@ def extract_pages_from_file(file_path: str) -> list[dict]:
 
     try:
         if ext == ".pdf":
-            reader = PdfReader(file_path)
-            for i, page in enumerate(reader.pages):
-                extracted = page.extract_text()
-                if extracted and extracted.strip():
-                    pages.append({"page_number": i + 1, "text": extracted})
+            loader = OpenDataLoaderPDFLoader(
+                file_path=file_path,
+                format="markdown",
+                split_pages=True,
+            )
+            documents = loader.load()
+            for i, doc in enumerate(documents):
+                content = doc.page_content
+                if content and content.strip():
+                    page_num = doc.metadata.get("page", i + 1)
+                    pages.append({"page_number": page_num, "text": content})
         else:
             # For non-PDFs, just treat the whole text as "Page 1" for now
             # Later we can employ chunking logic here if text files are huge

@@ -27,20 +27,51 @@ def test_extract_text_csv(tmp_path):
     assert "a" in text
 
 
-@patch("gm_shield.features.knowledge.service.PdfReader")
-def test_extract_text_pdf(mock_pdf_reader):
-    mock_page = MagicMock()
-    mock_page.extract_text.return_value = "PDF Content"
-    mock_pdf_reader.return_value.pages = [mock_page]
+@patch("gm_shield.features.knowledge.service.OpenDataLoaderPDFLoader")
+def test_extract_text_pdf(mock_loader_cls):
+    """PDF extraction uses OpenDataLoaderPDFLoader with markdown format."""
+    from langchain_core.documents import Document
 
-    # We don't need a real file for mocked PDF reader, just a path that "exists"
-    with (
-        patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.suffix", new_callable=lambda: ".pdf"),
-    ):
+    mock_doc = Document(page_content="# Chapter 1\n\nPDF Content in Markdown", metadata={"page": 1})
+    mock_loader = MagicMock()
+    mock_loader.load.return_value = [mock_doc]
+    mock_loader_cls.return_value = mock_loader
+
+    with patch("pathlib.Path.exists", return_value=True), \
+         patch("pathlib.Path.suffix", new_callable=lambda: ".pdf"):
         text = extract_text_from_file("dummy.pdf")
-        assert "PDF Content" in text
+        assert "PDF Content in Markdown" in text
 
+    # Verify the loader was configured with markdown format
+    mock_loader_cls.assert_called_once_with(file_path="dummy.pdf", format="markdown")
+
+
+
+
+@patch("gm_shield.features.knowledge.service.OpenDataLoaderPDFLoader")
+def test_extract_pages_pdf(mock_loader_cls):
+    """Pages extraction returns per-page dicts with markdown content."""
+    from langchain_core.documents import Document
+    from gm_shield.features.knowledge.service import extract_pages_from_file
+
+    mock_docs = [
+        Document(page_content="# Page 1 content", metadata={"page": 1}),
+        Document(page_content="# Page 2 content", metadata={"page": 2}),
+    ]
+    mock_loader = MagicMock()
+    mock_loader.load.return_value = mock_docs
+    mock_loader_cls.return_value = mock_loader
+
+    with patch("pathlib.Path.exists", return_value=True), \
+         patch("pathlib.Path.suffix", new_callable=lambda: ".pdf"):
+        pages = extract_pages_from_file("dummy.pdf")
+
+    assert len(pages) == 2
+    assert pages[0]["page_number"] == 1
+    assert "Page 1 content" in pages[0]["text"]
+    mock_loader_cls.assert_called_once_with(
+        file_path="dummy.pdf", format="markdown", split_pages=True
+    )
 
 def test_extract_text_unsupported(tmp_path):
     bad_file = tmp_path / "test.exe"
