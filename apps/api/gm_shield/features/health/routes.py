@@ -181,7 +181,7 @@ class LLMHealthResponse(BaseModel):
 
 
 @router.get(
-    "/api/v1/system/llm-health",
+    "/system/llm-health",
     response_model=LLMHealthResponse,
     tags=["System"],
     summary="Check AI subsystem health",

@@ -71,7 +71,7 @@ def test_health_status_all_ok(override_get_db, mock_chroma, mock_httpx):
     # Set the return value of get(). Since instance is AsyncMock, instance.get is AsyncMock.
     instance.get.return_value = response_mock
 
-    response = client.get("/health/status")
+    response = client.get("/api/v1/health/status")
 
     # Debug info
     if response.status_code != 200 or not response.json().get("ollama"):
@@ -102,7 +102,7 @@ def test_health_status_missing_model(override_get_db, mock_chroma, mock_httpx):
     }
     instance.get.return_value = response_mock
 
-    response = client.get("/health/status")
+    response = client.get("/api/v1/health/status")
     assert response.status_code == 200
     data = response.json()
     assert data["ollama_models"]["granite4:latest"] is False
@@ -127,7 +127,7 @@ def test_health_status_db_fail(mock_chroma, mock_httpx):
     instance.get.return_value.status_code = 200
     instance.get.return_value.json.return_value = {"models": []}
 
-    response = client.get("/health/status")
+    response = client.get("/api/v1/health/status")
     app.dependency_overrides = {}
 
     assert response.status_code == 200

@@ -147,6 +147,7 @@ async def root():
 
 app.include_router(
     health_routes.router,
+    prefix=settings.API_V1_STR,
     tags=["Health"],
 )
 
