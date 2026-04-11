@@ -25,6 +25,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Install Java for opendataloader-pdf
+RUN apt-get update && apt-get install -y default-jre-headless && rm -rf /var/lib/apt/lists/*
+
 # Create a non-root user for security
 RUN useradd -m -u 1000 appuser
 
