@@ -106,14 +106,16 @@ def test_post_knowledge_source_creates_db_record(mock_queue, mock_create):
 
     response = client.post(
         "/api/v1/knowledge/",
-        json={"file_path": "/docs/monsters.pdf"},
+        files={"file": ("monsters.pdf", b"dummy content", "application/pdf")},
     )
 
     assert response.status_code == 202
     assert response.json()["task_id"] == "task-xyz"
 
     # Check interaction
-    mock_create.assert_called_with("/docs/monsters.pdf")
+    mock_create.assert_called_once()
+    args, _ = mock_create.call_args
+    assert args[0].endswith("_monsters.pdf")
 
     # Check queue enqueued with ID
     args, _ = queue.enqueue.call_args

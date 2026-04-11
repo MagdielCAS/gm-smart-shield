@@ -37,11 +37,4 @@ jobs:
     - name: Build Web
       run: pnpm build
 
-    - name: Build Electron Main
-      run: pnpm electron:build
 
-    - name: Build and Release Electron App
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # This will build and upload artifacts to the GitHub release
-      run: pnpm electron-builder --publish always

@@ -26,39 +26,14 @@
       "sourceMapPathOverrides": {
         "webpack:///./src/*": "${webRoot}/*"
       }
-    },
-    {
-      "name": "Web: Debug Electron (main process)",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "${workspaceFolder}/apps/web/node_modules/.bin/electron",
-      "args": [".", "--remote-debugging-port=9223"],
-      "cwd": "${workspaceFolder}/apps/web",
-      "sourceMaps": true,
-      "outFiles": ["${workspaceFolder}/apps/web/dist-electron/**/*.js"],
-      "resolveSourceMapLocations": [
-        "${workspaceFolder}/apps/web/dist-electron/**",
-        "!**/node_modules/**"
-      ],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Web: Debug Electron (renderer via Chrome)",
-      "type": "chrome",
-      "request": "attach",
-      "port": 9223,
-      "webRoot": "${workspaceFolder}/apps/web/src",
-      "sourceMaps": true,
-      "timeout": 15000
     }
   ],
   "compounds": [
     {
-      "name": "Full Stack: API + Electron",
+      "name": "Full Stack: API + Web",
       "configurations": [
         "API: Debug FastAPI (uvicorn)",
-        "Web: Debug Electron (main process)",
-        "Web: Debug Electron (renderer via Chrome)"
+        "Web: Debug Vite (browser)"
       ],
       "stopAll": true
     }

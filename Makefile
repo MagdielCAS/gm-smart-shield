@@ -16,20 +16,16 @@ web-setup: ## Setup Web dependencies
 	@echo "Setting up Web dependencies..."
 	cd apps/web && pnpm install
 
-dev: ## Run the whole project in development mode (API + Electron app)
-	@echo "Starting API and Electron app in development mode..."
+dev: ## Run the whole project in development mode (API + Web)
+	@echo "Starting API and Web in development mode..."
 	@trap 'kill 0' SIGINT; \
 		(cd apps/api && uv run uvicorn gm_shield.main:app --reload --port 8000) & \
-		(cd apps/web && pnpm electron:dev) & \
+		(cd apps/web && pnpm dev) & \
 		wait
 
 dev-api: ## Run only the API server in development mode
 	@echo "Running API in development mode..."
 	cd apps/api && uv run uvicorn gm_shield.main:app --reload --port 8000
-
-dev-electron: ## Run only the Electron app (Vite + Electron) in development mode
-	@echo "Running Electron app in development mode..."
-	cd apps/web && pnpm electron:dev
 
 run-api: ## Run API server
 	@echo "Running API..."

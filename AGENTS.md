@@ -17,7 +17,7 @@
 
 ## Frontend context
 - See `apps/web/AGENTS.md` for frontend-specific guidelines.
-- Frontend resides in `apps/web` and is isolated from the backend build process.
+- Frontend resides in `apps/web` and is an SPA.
 - Orchestration is handled via the root `Makefile`.
 
 ## Rules for adding features

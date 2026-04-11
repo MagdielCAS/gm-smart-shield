@@ -8,9 +8,6 @@ vi.mock("../config", () => ({
 	API_BASE_URL: "/api",
 }));
 
-// Mock electron
-const mockOpenFile = vi.fn();
-
 // Mock fetch
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -85,7 +82,6 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 describe("KnowledgePage", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		window.electron = { openFile: mockOpenFile };
 	});
 
 	it("renders page structure correctly", async () => {
@@ -165,8 +161,6 @@ describe("KnowledgePage", () => {
 	});
 
 	it("handles file selection and success API call", async () => {
-		mockOpenFile.mockResolvedValue("/path/to/test.txt");
-
 		// GET responses (list + stats)
 		mockGetResponses(emptyListResponse, emptyStatsResponse);
 
@@ -188,14 +182,13 @@ describe("KnowledgePage", () => {
 			return { ok: true, json: async () => emptyListResponse };
 		});
 
-		render(<KnowledgePage />, { wrapper });
+		const { container } = render(<KnowledgePage />, { wrapper });
 
-		const button = screen.getByRole("button", { name: "Select File" });
-		fireEvent.click(button);
-
-		await waitFor(() => {
-			expect(mockOpenFile).toHaveBeenCalled();
-		});
+		const input = container.querySelector(
+			'input[type="file"]',
+		) as HTMLInputElement;
+		const file = new File(["hello"], "test.txt", { type: "text/plain" });
+		fireEvent.change(input, { target: { files: [file] } });
 
 		await waitFor(() => {
 			expect(screen.getByText("Selected:")).toBeInTheDocument();
@@ -207,7 +200,6 @@ describe("KnowledgePage", () => {
 				"/api/v1/knowledge/",
 				expect.objectContaining({
 					method: "POST",
-					body: JSON.stringify({ file_path: "/path/to/test.txt" }),
 				}),
 			);
 		});
@@ -221,7 +213,6 @@ describe("KnowledgePage", () => {
 	});
 
 	it("handles API error on upload", async () => {
-		mockOpenFile.mockResolvedValue("/path/to/error.txt");
 		mockGetResponses(emptyListResponse, emptyStatsResponse);
 
 		mockFetch.mockImplementation(async (url: string, opts?: RequestInit) => {
@@ -236,9 +227,13 @@ describe("KnowledgePage", () => {
 			return { ok: true, json: async () => emptyListResponse };
 		});
 
-		render(<KnowledgePage />, { wrapper });
+		const { container } = render(<KnowledgePage />, { wrapper });
 
-		fireEvent.click(screen.getByRole("button", { name: "Select File" }));
+		const input = container.querySelector(
+			'input[type="file"]',
+		) as HTMLInputElement;
+		const file = new File(["hello"], "error.txt", { type: "text/plain" });
+		fireEvent.change(input, { target: { files: [file] } });
 
 		await waitFor(() => {
 			expect(screen.getByText("Something went wrong")).toBeInTheDocument();

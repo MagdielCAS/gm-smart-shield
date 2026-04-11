@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     # Database
     SQLITE_URL: str = f"sqlite:///{DATA_DIR}/db/gm_shield.db"
     CHROMA_PERSIST_DIRECTORY: str = str(DATA_DIR / "chroma")
+    UPLOADS_DIRECTORY: str = str(DATA_DIR / "uploads")
 
     # Worker
     WORKER_TYPE: str = "memory"  # 'memory' or 'redis' (future)
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
             os.path.dirname(self.SQLITE_URL.replace("sqlite:///", "")), exist_ok=True
         )
         os.makedirs(self.CHROMA_PERSIST_DIRECTORY, exist_ok=True)
+        os.makedirs(self.UPLOADS_DIRECTORY, exist_ok=True)
 
 
 settings = Settings()

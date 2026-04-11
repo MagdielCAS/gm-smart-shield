@@ -65,21 +65,12 @@ Then("I should see status badges for each source \\(e.g., {string}, {string}\\)"
 
 // Ingest a new file and see progress
 Given("I have selected a file {string}", async ({ page }, filePath) => {
-    // Mock the file selection logic.
-    await page.addInitScript((path) => {
-        (window as Window & typeof globalThis & { electron?: { openFile: () => Promise<string> } }).electron = {
-            openFile: () => Promise.resolve(path),
-        };
-    }, filePath);
-
-    // Handle potential alerts if mock fails
-    page.on('dialog', dialog => {
-        console.log(`Dialog appeared: ${dialog.message()}`);
-        dialog.accept();
+    // Fill the hidden input[type="file"] with a mock buffer
+    await page.locator('input[type="file"]').setInputFiles({
+        name: filePath,
+        mimeType: 'text/markdown',
+        buffer: Buffer.from('dummy content')
     });
-
-    // Reload to apply init script
-    await page.reload();
 });
 
 When("I click the \"Add Source\" button", async ({ page }) => {
@@ -121,8 +112,9 @@ When("I click the \"Add Source\" button", async ({ page }) => {
         }
     });
 
-    // Try text locator
-    await page.locator("text=Select File").click({ force: true });
+    // The file upload was triggered via input change, so no explicit "Select File" button click needed if the test matches the DOM action.
+    // However, if the frontend assumes auto-submit on change, we are done. Let's just wait for the post.
+    // If we need to click something to submit (currently it uploads onChange), then we don't click anything here.
 });
 
 Then("I should see the new source appear in the list with status {string} or {string}", async ({ page }, _s1, s2) => {

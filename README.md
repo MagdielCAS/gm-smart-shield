@@ -67,11 +67,11 @@ All commands are exposed via the `Makefile`. Run `make help` to see the full lis
 
 | Command | Description |
 |---|---|
-| `make dev` | **Run the full project** (API + Electron app) in dev mode |
+| `make dev` | **Run the full project** (API + Frontend) in dev mode |
 | `make dev-api` | Run only the API server with hot-reload |
-| `make dev-electron` | Run only the Electron + Vite frontend |
+| `make dev-web` | Run only the Vite frontend |
 | `make run-api` | Run API server (alias, no explicit port) |
-| `make web-dev` | Run Vite dev server only (no Electron) |
+| `make web-dev` | Run Vite dev server only |
 
 ### Setup
 
@@ -118,9 +118,7 @@ A `.vscode/launch.json` is included with the following debug configurations:
 |---|---|
 | **API: Debug FastAPI (uvicorn)** | Attach Python debugger (`debugpy`) to the API |
 | **Web: Debug Vite (browser)** | Debug the Vite dev server in Chrome |
-| **Web: Debug Electron (main process)** | Debug the Electron Node.js main process |
-| **Web: Debug Electron (renderer via Chrome)** | Attach Chrome DevTools to the Electron renderer |
-| ⭐ **Full Stack: API + Electron** | Launch all debug sessions at once (compound) |
+| ⭐ **Full Stack: API + Web** | Launch all debug sessions at once (compound) |
 
 Open the **Run & Debug** panel (`Ctrl+Shift+D` / `Cmd+Shift+D`) and select the configuration you want.
 

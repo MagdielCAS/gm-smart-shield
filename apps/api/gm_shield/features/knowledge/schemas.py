@@ -9,26 +9,6 @@ from typing import Optional, List
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class KnowledgeSourceCreate(BaseModel):
-    """
-    Payload for ingesting a new knowledge source document.
-
-    The file must already exist on the local filesystem at the given path.
-    Supported formats: `.pdf`, `.md`, `.txt`, `.csv`.
-    """
-
-    file_path: str = Field(
-        ...,
-        description="Absolute or relative path to the source file on the local filesystem. "
-        "Supported formats: PDF (.pdf), Markdown (.md), plain text (.txt), CSV (.csv).",
-        examples=["/data/uploads/monster-manual.pdf"],
-    )
-    description: Optional[str] = Field(
-        default=None,
-        description="Optional human-readable label for this knowledge source.",
-        examples=["D&D 5e Monster Manual"],
-    )
-
 
 class KnowledgeSourceResponse(BaseModel):
     """

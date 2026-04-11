@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import ChatPage from "./pages/ChatPage";
 import EncountersPage from "./pages/EncountersPage";
@@ -12,8 +12,7 @@ import SheetDetailsPage from "./pages/SheetDetailsPage";
 import SheetsPage from "./pages/SheetsPage";
 
 const queryClient = new QueryClient();
-const Router =
-	window.location.protocol === "file:" ? HashRouter : BrowserRouter;
+const Router = BrowserRouter;
 
 function App() {
 	return (

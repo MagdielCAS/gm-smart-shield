@@ -1,4 +1,13 @@
 services:
+  web:
+    build:
+      context: apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
   api:
     build:
       context: apps/api
@@ -11,10 +20,12 @@ services:
       # Override paths for container environment
       - SQLITE_URL=sqlite:////app/data/db/gm_shield.db
       - CHROMA_PERSIST_DIRECTORY=/app/data/chroma
+      - UPLOADS_DIRECTORY=/app/data/uploads
     volumes:
       # Map host data directories to container
       - ./data/db:/app/data/db
       - ./data/chroma:/app/data/chroma
+      - ./data/uploads:/app/data/uploads
     depends_on:
       - ollama
       - prometheus
@@ -38,7 +49,7 @@ services:
   grafana:
     image: grafana/grafana
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
     environment:

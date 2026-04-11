@@ -9,7 +9,6 @@
 		"url": "https://github.com/MagdielCAS/gm-smart-shield"
 	},
 	"type": "module",
-	"main": "dist-electron/main.cjs",
 	"scripts": {
 		"dev": "vite",
 		"build": "tsc -b && vite build",
@@ -19,10 +18,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:e2e": "playwright test",
-		"test:bdd": "bddgen && playwright test",
-		"electron:build": "tsc -p tsconfig.electron.json",
-		"electron:dev": "concurrently -k \"pnpm dev\" \"wait-on tcp:5173 && pnpm electron:build && cross-env NODE_ENV=development electron .\"",
-		"electron:pack": "pnpm build && pnpm electron:build && electron-builder"
+		"test:bdd": "bddgen && playwright test"
 	},
 	"dependencies": {
 		"@radix-ui/react-tooltip": "^1.2.8",
@@ -48,38 +44,12 @@
 		"@types/react-dom": "^19.2.3",
 		"@vitejs/plugin-react": "^5.1.1",
 		"autoprefixer": "^10.4.24",
-		"concurrently": "^9.2.1",
-		"cross-env": "^10.1.0",
-		"electron": "^40.6.1",
-		"electron-builder": "^26.8.1",
 		"jsdom": "^28.1.0",
 		"playwright-bdd": "^8.4.2",
 		"postcss": "^8.5.6",
 		"tailwindcss": "^3.4.19",
 		"typescript": "~5.9.3",
 		"vite": "^7.3.1",
-		"vitest": "^4.0.18",
-		"wait-on": "^9.0.4"
-	},
-	"build": {
-		"appId": "com.gmshield.app",
-		"productName": "GM Smart Shield",
-		"directories": {
-			"output": "dist-app"
-		},
-		"files": [
-			"dist",
-			"dist-electron",
-			"package.json"
-		],
-		"mac": {
-			"target": "dmg"
-		},
-		"win": {
-			"target": "nsis"
-		},
-		"linux": {
-			"target": "AppImage"
-		}
+		"vitest": "^4.0.18"
 	}
 }

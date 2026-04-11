@@ -9,7 +9,7 @@ import {
 	Trash2,
 	UploadCloud,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { GlassButton } from "../components/ui/GlassButton";
 import { GlassCard } from "../components/ui/GlassCard";
 import { SFIcon } from "../components/ui/SFIcon";
@@ -23,11 +23,6 @@ import { API_BASE_URL } from "../config";
 import { cn } from "../lib/utils";
 
 // ── Types ────────────────────────────────────────────────────────────────────
-
-interface KnowledgeSourceCreate {
-	file_path: string;
-	description?: string;
-}
 
 interface KnowledgeSourceResponse {
 	task_id: string;
@@ -94,18 +89,11 @@ const KnowledgePage = () => {
 		queryFn: fetchKnowledgeStats,
 	});
 
-	const mutation = useMutation<
-		KnowledgeSourceResponse,
-		Error,
-		KnowledgeSourceCreate
-	>({
-		mutationFn: async (newSource) => {
+	const mutation = useMutation<KnowledgeSourceResponse, Error, FormData>({
+		mutationFn: async (formData) => {
 			const response = await fetch(`${API_BASE_URL}/v1/knowledge/`, {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(newSource),
+				body: formData,
 			});
 
 			if (!response.ok) {
@@ -168,22 +156,23 @@ const KnowledgePage = () => {
 		}
 	};
 
-	const handleSelectFile = async () => {
-		if (!window.electron) {
-			alert(
-				"Electron API is not available. This feature works only in the Electron app.",
-			);
-			return;
-		}
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
-		try {
-			const filePath = await window.electron.openFile();
-			if (filePath) {
-				setSelectedFile(filePath);
-				mutation.mutate({ file_path: filePath });
-			}
-		} catch (error) {
-			console.error("Failed to open file:", error);
+	const handleSelectFile = () => {
+		fileInputRef.current?.click();
+	};
+
+	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (file) {
+			setSelectedFile(file.name);
+			const formData = new FormData();
+			formData.append("file", file);
+			mutation.mutate(formData);
+		}
+		// Reset input value to allow selecting the same file again if needed
+		if (e.target) {
+			e.target.value = "";
 		}
 	};
 
@@ -271,6 +260,13 @@ const KnowledgePage = () => {
 						</p>
 
 						<div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+							<input
+								type="file"
+								className="hidden"
+								ref={fileInputRef}
+								onChange={handleFileChange}
+								accept=".pdf,.txt,.md,.csv"
+							/>
 							<GlassButton
 								onClick={handleSelectFile}
 								disabled={mutation.isPending}

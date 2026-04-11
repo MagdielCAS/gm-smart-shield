@@ -8,11 +8,13 @@ response is returned immediately.
 """
 
 import asyncio
-from fastapi import APIRouter, status, HTTPException
+import os
+import uuid
+from fastapi import APIRouter, status, HTTPException, UploadFile, File
+from gm_shield.core.config import settings
 
 from gm_shield.features.knowledge.schemas import (
     KnowledgeListResponse,
-    KnowledgeSourceCreate,
     KnowledgeSourceItem,
     KnowledgeSourceResponse,
     KnowledgeStatsResponse,
@@ -54,23 +56,32 @@ router = APIRouter()
         },
     },
 )
-async def add_knowledge_source(source: KnowledgeSourceCreate):
+async def add_knowledge_source(file: UploadFile = File(...)):
     """
-    Accept a file for ingestion into the knowledge base.
+    Accept a file for ingestion into the knowledge base via multipart upload.
 
-    The file is **not** processed synchronously. Instead, a background task is
-    enqueued that will:
+    The file is saved to the local UPLOADS_DIRECTORY. 
+    Then, a background task is enqueued that will:
     1. Extract raw text from the file (PDF, Markdown, plain text, or CSV).
     2. Split the text into overlapping chunks (~1 000 tokens).
     3. Generate vector embeddings using `all-MiniLM-L6-v2`.
     4. Store the chunks and embeddings in ChromaDB under the `knowledge_base` collection.
 
-    Returns a `task_id` that can be used to poll the processing status via
-    `GET /api/v1/tasks/{task_id}` (when that endpoint is available).
+    Returns a `task_id` that can be used to poll the processing status.
     """
-    # Create DB record synchronously (wrapped in thread)
+    # 1. Save the file to disk
+    file_id = str(uuid.uuid4())
+    safe_filename = file.filename.replace(" ", "_")
+    upload_path = os.path.join(settings.UPLOADS_DIRECTORY, f"{file_id}_{safe_filename}")
+    
+    # Write file asynchronously
+    content = await file.read()
+    with open(upload_path, "wb") as f:
+        f.write(content)
+
+    # 2. Create DB record synchronously (wrapped in thread)
     source_id = await asyncio.to_thread(
-        create_or_update_knowledge_source, source.file_path
+        create_or_update_knowledge_source, upload_path
     )
 
     queue = get_task_queue()
@@ -80,7 +91,7 @@ async def add_knowledge_source(source: KnowledgeSourceCreate):
     return KnowledgeSourceResponse(
         task_id=task_id,
         status="pending",
-        message=f"Processing started for {source.file_path}",
+        message=f"Processing started for {file.filename}",
     )
 
 

@@ -25,7 +25,8 @@ def valid_knowledge_source(context, file_path):
 @when("I submit the file for ingestion")
 def submit_ingestion(client, context):
     file_path = context["file_path"]
-    response = client.post("/api/v1/knowledge/", json={"file_path": file_path})
+    filename = file_path.split("/")[-1]
+    response = client.post("/api/v1/knowledge/", files={"file": (filename, b"dummy content", "text/plain")})
     context["response"] = response
     # Store the ID if successful
     if response.status_code == 202:
@@ -54,11 +55,12 @@ def check_response_status(context, status):
 # Scenario: List knowledge sources
 @given(parsers.parse('I have ingested a knowledge source "{file_path}"'))
 def ensure_ingested_source(client, context, file_path):
+    filename = file_path.split("/")[-1]
     # Check if exists first
     response = client.get("/api/v1/knowledge/")
     items = response.json().get("items", [])
-    if not any(i["source"] == file_path for i in items):
-        client.post("/api/v1/knowledge/", json={"file_path": file_path})
+    if not any(i["source"].endswith(filename) for i in items):
+        client.post("/api/v1/knowledge/", files={"file": (filename, b"dummy content", "text/plain")})
 
 
 @when("I request the list of knowledge sources")
@@ -68,8 +70,9 @@ def request_list(client, context):
 
 @then(parsers.parse('the list should contain "{file_path}"'))
 def check_list_contains(context, file_path):
+    filename = file_path.split("/")[-1]
     items = context["response"].json()["items"]
-    assert any(i["source"] == file_path for i in items)
+    assert any(i["source"].endswith(filename) for i in items)
 
 
 @then(
@@ -78,8 +81,9 @@ def check_list_contains(context, file_path):
     )
 )
 def check_status_options(context, file_path, s1, s2, s3, s4):
+    filename = file_path.split("/")[-1]
     items = context["response"].json()["items"]
-    item = next((i for i in items if i["source"] == file_path), None)
+    item = next((i for i in items if i["source"].endswith(filename)), None)
     assert item is not None
     assert item["status"] in [s1, s2, s3, s4]
 
@@ -87,26 +91,26 @@ def check_status_options(context, file_path, s1, s2, s3, s4):
 # Scenario: Refresh
 @given(parsers.parse("I have an existing knowledge source with ID {source_id:d}"))
 def ensure_source_id(client, context, source_id):
-    # Ensure a source exists. We'll use a specific path to ensure consistency.
-    file_path = f"/docs/source_{source_id}.pdf"
+    # Ensure a source exists. We'll use a specific filename to ensure consistency.
+    filename = f"source_{source_id}.pdf"
 
     # Check if it exists and get its real ID
     list_resp = client.get("/api/v1/knowledge/")
     items = list_resp.json().get("items", [])
-    existing = next((i for i in items if i["source"] == file_path), None)
+    existing = next((i for i in items if i["source"].endswith(filename)), None)
 
     if existing:
         context["source_id"] = existing["id"]
-        context["file_path"] = file_path
+        context["file_path"] = existing["source"]
     else:
         # Create it
-        client.post("/api/v1/knowledge/", json={"file_path": file_path})
+        client.post("/api/v1/knowledge/", files={"file": (filename, b"dummy content", "application/pdf")})
         # Fetch again to get ID
         list_resp = client.get("/api/v1/knowledge/")
         items = list_resp.json()["items"]
-        new_item = next((i for i in items if i["source"] == file_path), None)
+        new_item = next((i for i in items if i["source"].endswith(filename)), None)
         context["source_id"] = new_item["id"]
-        context["file_path"] = file_path
+        context["file_path"] = new_item["source"]
 
 
 @when(parsers.parse("I request to delete knowledge source {source_id:d}"))
