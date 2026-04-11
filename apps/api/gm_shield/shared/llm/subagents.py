@@ -2,7 +2,6 @@
 DeepAgents subagent configurations for the main Chat Orchestrator.
 """
 
-
 from gm_shield.shared.llm import config as llm_config
 from gm_shield.features.encounters.service import EncounterAgent
 from gm_shield.features.knowledge.agents.sheet import SheetAgent

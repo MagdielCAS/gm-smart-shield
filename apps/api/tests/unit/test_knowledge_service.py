@@ -13,6 +13,7 @@ from gm_shield.features.knowledge.service import (
     process_knowledge_source,
     delete_knowledge_source,
 )
+# import gm_shield.features.knowledge.agents.page_summary  # Removed as it was unused and failing lint
 
 
 # ── Fixtures & Mocks ──────────────────────────────────────────────────────────
@@ -31,19 +32,23 @@ def mock_db_session():
 def mock_external_services():
     """Patch all external heavy dependencies (PDF, ML models, ChromaDB)."""
     with (
-        patch("gm_shield.features.knowledge.service.extract_text_from_file") as extract,
-        patch(
-            "gm_shield.features.knowledge.service.RecursiveCharacterTextSplitter"
-        ) as splitter,
+        patch("gm_shield.features.knowledge.service.extract_pages_from_file") as extract,
+        patch("gm_shield.features.knowledge.agents.page_summary.PageSummaryAgent") as page_agent,
         patch("gm_shield.features.knowledge.service.get_embedding_model") as embed,
         patch("gm_shield.features.knowledge.service.get_chroma_client") as chroma,
     ):
         # Setup default successful behaviors
-        extract.return_value = "Chunk1 Chunk2 Chunk3"
+        extract.return_value = [
+            {"page_number": 1, "text": "Page 1 chunk"},
+            {"page_number": 2, "text": "Page 2 chunk"},
+            {"page_number": 3, "text": "Page 3 chunk"}
+        ]
 
-        splitter_instance = MagicMock()
-        splitter_instance.split_text.return_value = ["Chunk1", "Chunk2", "Chunk3"]
-        splitter.return_value = splitter_instance
+        agent_instance = MagicMock()
+        async def mock_summarize(text):
+            return "Mocked summary"
+        agent_instance.summarize_page = mock_summarize
+        page_agent.return_value = agent_instance
 
         model_instance = MagicMock()
         model_instance.encode.return_value = MagicMock(
@@ -56,7 +61,7 @@ def mock_external_services():
 
         yield {
             "extract": extract,
-            "splitter": splitter_instance,
+            "page_agent": agent_instance,
             "embed": model_instance,
             "collection": collection,
         }
@@ -90,7 +95,7 @@ async def test_process_knowledge_source_success(
     result = await process_knowledge_source(1)
 
     # Verify result string
-    assert "Processed 3 chunks" in result
+    assert "Processed 3 pages" in result
 
     # Verify DB interactions
     # 1. Initial lookup
@@ -129,8 +134,8 @@ async def test_process_knowledge_source_extraction_failure(
         source_record
     )
 
-    # Mock extraction returning empty string
-    mock_external_services["extract"].return_value = ""
+    # Mock extraction returning empty list
+    mock_external_services["extract"].return_value = []
 
     result = await process_knowledge_source(1)
 

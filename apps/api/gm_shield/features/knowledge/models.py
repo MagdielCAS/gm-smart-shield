@@ -60,6 +60,8 @@ class QuickReference(Base):
 
     # Metadata
     tags: Mapped[Optional[list]] = mapped_column(JSON)  # e.g. ["Fire", "Level 1"]
+    source_page: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    source_section: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)

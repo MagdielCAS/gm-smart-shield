@@ -42,12 +42,15 @@ def given_sheet_source(sheet_source_id):
 def run_sheet_extraction_task(db_session, sheet_source_id, monkeypatch):
     source_id = sheet_source_id
 
-    # Mock extract_text_from_file located in gm_shield.features.knowledge.service
-    mock_extract = MagicMock(
-        return_value="Character Name: ____________\nClass: __________ Level: ___\nSTR: __ DEX: __"
-    )
+    mock_chroma_client = MagicMock()
+    mock_collection = MagicMock()
+    mock_collection.query.return_value = {
+        "documents": [["Character Name: ____________\nClass: __________ Level: ___\nSTR: __ DEX: __"]]
+    }
+    mock_chroma_client.get_or_create_collection.return_value = mock_collection
+    
     monkeypatch.setattr(
-        "gm_shield.features.knowledge.service.extract_text_from_file", mock_extract
+        "gm_shield.shared.database.chroma.get_chroma_client", lambda: mock_chroma_client
     )
 
     # Mock SheetAgent
@@ -119,12 +122,15 @@ def given_ref_source(ref_source_id):
 def run_reference_extraction_task(db_session, ref_source_id, monkeypatch):
     source_id = ref_source_id
 
-    # Mock extract_text_from_file located in gm_shield.features.knowledge.service
-    mock_extract = MagicMock(
-        return_value="Fireball: Level 3 Evocation. 8d6 fire damage."
-    )
+    mock_chroma_client = MagicMock()
+    mock_collection = MagicMock()
+    mock_collection.query.return_value = {
+        "documents": [["Fireball: Level 3 Evocation. 8d6 fire damage."]]
+    }
+    mock_chroma_client.get_or_create_collection.return_value = mock_collection
+    
     monkeypatch.setattr(
-        "gm_shield.features.knowledge.service.extract_text_from_file", mock_extract
+        "gm_shield.shared.database.chroma.get_chroma_client", lambda: mock_chroma_client
     )
 
     mock_agent = AsyncMock()

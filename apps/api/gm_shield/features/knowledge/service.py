@@ -17,7 +17,6 @@ from pathlib import Path
 
 import pandas as pd
 from pypdf import PdfReader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
 
@@ -85,10 +84,10 @@ def extract_text_from_file(file_path: str) -> str:
         if ext == ".pdf":
             reader = PdfReader(file_path)
             text = ""
-            for page in reader.pages:
+            for i, page in enumerate(reader.pages):
                 extracted = page.extract_text()
                 if extracted:
-                    text += extracted + "\n"
+                    text += f"\n--- Page {i + 1} ---\n{extracted}\n"
             return text
 
         elif ext in [".txt", ".md"]:
@@ -104,6 +103,42 @@ def extract_text_from_file(file_path: str) -> str:
 
     except Exception as e:
         logger.error("text_extraction_failed", file_path=file_path, error=str(e))
+        raise
+
+def extract_pages_from_file(file_path: str) -> list[dict]:
+    """
+    Extract text as discrete pages/chunks. 
+    For PDFs, returns one dict per page.
+    For TXT/MD/CSV, returns the file treated as a single "page" (or chunks if needed).
+
+    Returns:
+        List of dicts: `[{"page_number": int, "text": str}]`
+    """
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    ext = path.suffix.lower()
+    pages = []
+
+    try:
+        if ext == ".pdf":
+            reader = PdfReader(file_path)
+            for i, page in enumerate(reader.pages):
+                extracted = page.extract_text()
+                if extracted and extracted.strip():
+                    pages.append({"page_number": i + 1, "text": extracted})
+        else:
+            # For non-PDFs, just treat the whole text as "Page 1" for now
+            # Later we can employ chunking logic here if text files are huge
+            text = extract_text_from_file(file_path)
+            if text and text.strip():
+                pages.append({"page_number": 1, "text": text})
+
+        return pages
+
+    except Exception as e:
+        logger.error("page_extraction_failed", file_path=file_path, error=str(e))
         raise
 
 
@@ -181,55 +216,70 @@ def _process_sync(source_id: int) -> str:
             started_at=datetime.now(timezone.utc),
         )
 
-        # 2. Extract
-        text = extract_text_from_file(file_path)
-        if not text.strip():
-            logger.warning("no_text_extracted", file_path=file_path)
+        # 2. Extract Pages
+        pages = extract_pages_from_file(file_path)
+        if not pages:
+            logger.warning("no_pages_extracted", file_path=file_path)
             _update_task_state(
                 session, source_id, status="failed", error="No text content found"
             )
             return "No text content found"
 
-        # 3. Chunk
-        _update_task_state(session, source_id, progress=20.0, step="Chunking text")
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-            length_function=len,
-        )
-        chunks = text_splitter.split_text(text)
-        logger.info("chunks_generated", file_path=file_path, chunk_count=len(chunks))
-
-        if not chunks:
+        # 3. Summarize Pages
+        _update_task_state(session, source_id, progress=20.0, step="Summarizing pages")
+        
+        import asyncio
+        from gm_shield.features.knowledge.agents.page_summary import PageSummaryAgent
+        summary_agent = PageSummaryAgent()
+        
+        summarized_pages = []
+        total_pages = len(pages)
+        for i, page in enumerate(pages):
+            page_text = page["text"]
+            # Call the async summarize_page within the synchronous thread pool worker
+            page_summary = asyncio.run(summary_agent.summarize_page(page_text))
+            
+            summarized_pages.append({
+                "page_number": page["page_number"],
+                "summary": page_summary or "Unsummarized",
+                "text": page_text
+            })
+            
+            # Calculate progress between 20% and 70%
+            current_progress = 20.0 + (50.0 * ((i + 1) / total_pages))
             _update_task_state(
-                session, source_id, status="failed", error="No chunks generated"
+                session,
+                source_id,
+                progress=current_progress,
+                step=f"Summarizing pages ({i + 1}/{total_pages})",
             )
-            return "No chunks generated"
 
-        # 4. Embed (Batched)
+        # 4. Embed Summaries (Batched)
         _update_task_state(
-            session, source_id, progress=30.0, step="Generating embeddings"
+            session, source_id, progress=70.0, step="Generating embeddings"
         )
         model = get_embedding_model()
 
         batch_size = 32
-        total_chunks = len(chunks)
         embeddings = []
 
-        for i in range(0, total_chunks, batch_size):
-            batch = chunks[i : i + batch_size]
+        # We primarily embed the summary for dense retrieval
+        summary_texts = [p["summary"] for p in summarized_pages]
+
+        for i in range(0, total_pages, batch_size):
+            batch = summary_texts[i : i + batch_size]
             batch_embeddings = model.encode(batch)
             embeddings.extend(batch_embeddings)
 
-            # Calculate progress between 30% and 90%
-            current_progress = 30.0 + (
-                60.0 * (min(i + batch_size, total_chunks) / total_chunks)
+            # Calculate progress between 70% and 90%
+            current_progress = 70.0 + (
+                20.0 * (min(i + batch_size, total_pages) / total_pages)
             )
             _update_task_state(
                 session,
                 source_id,
                 progress=current_progress,
-                step=f"Generating embeddings ({min(i + batch_size, total_chunks)}/{total_chunks})",
+                step=f"Generating embeddings ({min(i + batch_size, total_pages)}/{total_pages})",
             )
 
         # 5. Store in ChromaDB
@@ -245,13 +295,16 @@ def _process_sync(source_id: int) -> str:
         existing_ids = existing_chunks.get("ids", [])
 
         base_id = uuid.uuid4().hex[:8]
-        ids = [f"{Path(file_path).name}_{base_id}_{i}" for i in range(len(chunks))]
+        ids = [f"{Path(file_path).name}_{base_id}_{p['page_number']}" for p in summarized_pages]
         metadatas = [
-            {"source": file_path, "chunk_index": i} for i in range(len(chunks))
+            {"source": file_path, "page_number": p["page_number"], "summary": p["summary"]} for p in summarized_pages
         ]
+        
+        # Store the actual full page text as the document so it can be retrieved by agents
+        documents = [p["text"] for p in summarized_pages]
 
         collection.add(
-            documents=chunks,
+            documents=documents,
             embeddings=[e.tolist() for e in embeddings],  # numpy array to list
             metadatas=metadatas,
             ids=ids,
@@ -273,14 +326,14 @@ def _process_sync(source_id: int) -> str:
             source_record.progress = 100.0
             source_record.current_step = "Done"
             source_record.last_indexed_at = datetime.now(timezone.utc)
-            source_record.chunk_count = len(chunks)
+            source_record.chunk_count = total_pages
             source_record.error_message = None
             if not source_record.features:
                 source_record.features = ["indexation"]  # Default feature
             session.commit()
 
-        logger.info("ingestion_complete", file_path=file_path, chunk_count=len(chunks))
-        return f"Processed {len(chunks)} chunks"
+        logger.info("ingestion_complete", file_path=file_path, page_count=total_pages)
+        return f"Processed {total_pages} pages"
 
     except Exception as e:
         logger.error("ingestion_failed", source_id=source_id, error=str(e))

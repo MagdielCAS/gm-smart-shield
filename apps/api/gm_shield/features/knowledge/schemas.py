@@ -139,3 +139,18 @@ class KnowledgeStatsResponse(BaseModel):
         description="Total number of text chunks stored across all documents.",
         examples=[1420],
     )
+
+
+class QuickReferenceResponse(BaseModel):
+    """Schema for a quick reference item."""
+
+    id: int
+    source_id: int
+    name: str
+    category: str
+    description: str
+    tags: Optional[List[str]] = None
+    source_page: Optional[int] = None
+    source_section: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)

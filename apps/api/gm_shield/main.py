@@ -17,6 +17,7 @@ from gm_shield.features.knowledge import router as knowledge_router_module
 from gm_shield.features.notes import routes as notes_routes
 from gm_shield.features.encounters import routes as encounter_routes
 from gm_shield.features.mcp import routes as mcp_routes
+from gm_shield.features.sheets import router as sheets_router
 from gm_shield.core.telemetry import setup_telemetry
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -177,4 +178,10 @@ app.include_router(
     mcp_routes.router,
     prefix=f"{settings.API_V1_STR}/mcp",
     tags=["MCP"],
+)
+
+app.include_router(
+    sheets_router.router,
+    prefix=f"{settings.API_V1_STR}/sheets",
+    tags=["Sheets"],
 )

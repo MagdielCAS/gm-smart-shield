@@ -1,19 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { FileBadge, Loader2, Plus, Search } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { NewSheetModal } from "../components/sheets/NewSheetModal";
 import { GlassButton } from "../components/ui/GlassButton";
 import { GlassCard } from "../components/ui/GlassCard";
 import { API_BASE_URL } from "../config";
 
 interface CharacterSheet {
 	id: string;
-	playerName: string;
-	characterName: string;
-	templateId: string;
+	player_name: string;
+	character_name: string;
+	template_id: string;
 }
 
 const SheetsPage = () => {
 	const [searchTerm, setSearchTerm] = useState("");
+	const [isModalOpen, setIsModalOpen] = useState(false);
+	const navigate = useNavigate();
 
 	const {
 		data: sheets = [],
@@ -33,8 +37,12 @@ const SheetsPage = () => {
 
 	const filteredSheets = sheets.filter(
 		(sheet) =>
-			sheet.characterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			sheet.playerName.toLowerCase().includes(searchTerm.toLowerCase()),
+			(sheet.character_name || "")
+				.toLowerCase()
+				.includes(searchTerm.toLowerCase()) ||
+			(sheet.player_name || "")
+				.toLowerCase()
+				.includes(searchTerm.toLowerCase()),
 	);
 
 	return (
@@ -59,7 +67,11 @@ const SheetsPage = () => {
 							className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary/50 outline-none transition-all"
 						/>
 					</div>
-					<GlassButton size="sm" className="shrink-0 gap-2">
+					<GlassButton
+						size="sm"
+						className="shrink-0 gap-2"
+						onClick={() => setIsModalOpen(true)}
+					>
 						<Plus className="h-4 w-4" /> New Sheet
 					</GlassButton>
 				</div>
@@ -84,7 +96,11 @@ const SheetsPage = () => {
 							: "Upload rulebooks to extract character sheet templates, or create one manually."}
 					</p>
 					{!searchTerm && (
-						<GlassButton className="mt-6 gap-2" variant="secondary">
+						<GlassButton
+							className="mt-6 gap-2"
+							variant="secondary"
+							onClick={() => setIsModalOpen(true)}
+						>
 							<Plus className="h-4 w-4" /> Create First Sheet
 						</GlassButton>
 					)}
@@ -95,31 +111,37 @@ const SheetsPage = () => {
 						<GlassCard
 							key={sheet.id}
 							className="flex flex-col relative group cursor-pointer hover:bg-white/10 transition-colors"
+							onClick={() => navigate(`/sheets/${sheet.id}`)}
 						>
 							<div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
 								<div className="h-2 w-2 rounded-full bg-primary" />
 							</div>
 							<div className="flex items-center gap-4 mb-4">
 								<div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary/40 to-primary/10 flex items-center justify-center text-lg font-bold border border-white/10">
-									{sheet.characterName.charAt(0)}
+									{(sheet.character_name || "?").charAt(0)}
 								</div>
 								<div>
 									<h3 className="font-bold text-foreground truncate max-w-[150px]">
-										{sheet.characterName}
+										{sheet.character_name}
 									</h3>
 									<p className="text-xs text-muted-foreground">
-										Player: {sheet.playerName}
+										Player: {sheet.player_name}
 									</p>
 								</div>
 							</div>
 							<p className="text-xs text-muted-foreground mt-auto pt-4 border-t border-white/5">
 								Template ID:{" "}
-								<span className="font-mono">{sheet.templateId}</span>
+								<span className="font-mono">{sheet.template_id}</span>
 							</p>
 						</GlassCard>
 					))}
 				</div>
 			)}
+
+			<NewSheetModal
+				isOpen={isModalOpen}
+				onClose={() => setIsModalOpen(false)}
+			/>
 		</div>
 	);
 };

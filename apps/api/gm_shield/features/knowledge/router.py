@@ -25,6 +25,7 @@ from gm_shield.features.knowledge.service import (
     delete_knowledge_source,
 )
 from gm_shield.features.knowledge.tasks import run_knowledge_ingestion
+from gm_shield.features.knowledge import schemas
 from gm_shield.shared.worker.memory import get_task_queue
 
 router = APIRouter()
@@ -164,3 +165,27 @@ async def remove_knowledge_source(source_id: int):
         await asyncio.to_thread(delete_knowledge_source, source_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
+    "/references",
+    response_model=list[schemas.QuickReferenceResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List extracted quick references",
+    description="Returns extracted quick references (e.g. spells, equipment) filtered by category.",
+)
+async def list_quick_references(
+    category: str | None = None, skip: int = 0, limit: int = 100
+):
+    from gm_shield.shared.database.sqlite import SessionLocal
+    from gm_shield.features.knowledge.models import QuickReference
+
+    db = SessionLocal()
+    try:
+        query = db.query(QuickReference)
+        if category:
+            query = query.filter(QuickReference.category.ilike(f"%{category}%"))
+        results = query.offset(skip).limit(limit).all()
+        return results
+    finally:
+        db.close()

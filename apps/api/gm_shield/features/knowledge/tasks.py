@@ -48,7 +48,6 @@ async def run_sheet_extraction(source_id: int):
     Runs the Sheet Agent to extract character sheet templates from the ingested document.
     """
     from gm_shield.features.knowledge.models import KnowledgeSource
-    from gm_shield.features.knowledge.service import extract_text_from_file
 
     logger.info("sheet_extraction_started", source_id=source_id)
 
@@ -67,11 +66,28 @@ async def run_sheet_extraction(source_id: int):
             )
             return
 
-        # Extract raw text again (or we could have cached it, but disk is cheap for now)
+        # Use RAG to find relevant pages instead of reading the whole text
+        from gm_shield.shared.database.chroma import get_chroma_client
+        client = get_chroma_client()
+        collection = client.get_or_create_collection(name="knowledge_base")
+        
         try:
-            text = extract_text_from_file(source.file_path)
+            results = collection.query(
+                query_texts=["character sheet template, attributes, skills, equipment, class details"],
+                n_results=10,
+                where={"source": source.file_path}
+            )
+            
+            if not results or not results["documents"] or not results["documents"][0]:
+                logger.warning("sheet_extraction_no_relevant_pages_found", source_id=source_id)
+                return
+                
+            # Combine the text of the top matching pages to provide context to the SheetAgent
+            relevant_pages = results["documents"][0]
+            text = "\n\n...[Page Break]...\n\n".join(relevant_pages)
+            
         except Exception as e:
-            logger.error("sheet_extraction_text_read_failed", error=str(e))
+            logger.error("sheet_extraction_chroma_query_failed", error=str(e))
             return
 
         agent = SheetAgent()
@@ -115,7 +131,6 @@ async def run_reference_extraction(source_id: int):
     For this implementation, we will sample the first 15000 characters or key sections.
     """
     from gm_shield.features.knowledge.models import KnowledgeSource
-    from gm_shield.features.knowledge.service import extract_text_from_file
 
     logger.info("reference_extraction_started", source_id=source_id)
 
@@ -129,15 +144,29 @@ async def run_reference_extraction(source_id: int):
         if not source or source.status != "completed":
             return
 
+        # Use RAG to find relevant pages instead of reading the whole text
+        from gm_shield.shared.database.chroma import get_chroma_client
+        client = get_chroma_client()
+        collection = client.get_or_create_collection(name="knowledge_base")
+        
         try:
-            text = extract_text_from_file(source.file_path)
-        except Exception:
+            results = collection.query(
+                query_texts=["spells, weapons, equipment, items, feats, traits list"],
+                n_results=10,
+                where={"source": source.file_path}
+            )
+            
+            if not results or not results["documents"] or not results["documents"][0]:
+                logger.warning("reference_extraction_no_relevant_pages_found", source_id=source_id)
+                return
+                
+            # Combine the text of the top matching pages to provide context to the ReferenceAgent
+            relevant_pages = results["documents"][0]
+            text_chunk = "\n\n...[Page Break]...\n\n".join(relevant_pages)
+            
+        except Exception as e:
+            logger.error("reference_extraction_chroma_query_failed", error=str(e))
             return
-
-        # Limit text for the prototype to avoid massive context windows
-        # In a real app, we'd iterate over chunks or use a sliding window.
-        chunk_size = 10000
-        text_chunk = text[:chunk_size]
 
         agent = ReferenceAgent()
         result = await agent.extract_references(text_chunk)
@@ -153,6 +182,8 @@ async def run_reference_extraction(source_id: int):
                     category=item.category,
                     description=item.description,
                     tags=item.tags,
+                    source_page=item.source_page,
+                    source_section=item.source_section,
                 )
                 session.add(ref)
 

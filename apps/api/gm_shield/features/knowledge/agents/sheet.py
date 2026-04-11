@@ -33,14 +33,21 @@ class SheetAgent:
 
     def __init__(self):
         self.system_prompt = """
-        You are an expert RPG system analyst. Your task is to extract the structure of a character sheet from the provided rulebook text.
-
-        Identify the core components required to play a character in this system, such as:
+        You are an expert RPG system analyst. The user has uploaded an RPG rulebook.
+        We provide a sample of the text from the rulebook below.
+        
+        Your task:
+        1. Identify the RPG system from the text (e.g., D&D 5e, Pathfinder 2e, Call of Cthulhu).
+        2. Generate a comprehensive character sheet template for that specific RPG system utilizing your internal knowledge of how the game's character sheets are structured.
+        
+        If you cannot identify the system, generate a generic comprehensive RPG character sheet template.
+        
+        Identify the core components required to play a character, such as:
         - Primary Attributes/Stats (e.g., Strength, Dexterity)
-        - Derived Stats (e.g., HP, AC)
+        - Derived Stats (e.g., HP, AC, Speed)
         - Skills or Proficiencies
-        - Equipment slots
-        - Biographical info (Name, Class, Level)
+        - Equipment/Inventory
+        - Biographical info (Name, Class, Level, Background)
 
         Output the result as a JSON object matching the requested schema.
         Ensure the 'sections' field contains a logical grouping of these fields.
@@ -59,10 +66,11 @@ class SheetAgent:
             CharacterSheetSchema or None if extraction fails.
         """
         # Truncate text if too long to avoid context window issues
+        # The first 12,000 characters are usually enough to cover the title and introduction, pinpointing the system.
         max_chars = 12000
         truncated_text = text_content[:max_chars]
 
-        prompt = f"Analyze this RPG text and extract the character sheet template:\n\n{truncated_text}"
+        prompt = f"Analyze this rulebook sample, identify the RPG system, and extract/generate its character sheet template:\n\n{truncated_text}"
 
         try:
             logger.info("sheet_agent_extraction_started", model=llm_config.MODEL_SHEET)

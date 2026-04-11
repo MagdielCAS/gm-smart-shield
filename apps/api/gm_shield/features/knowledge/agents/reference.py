@@ -2,7 +2,7 @@
 Reference Agent - Extracts quick reference items (spells, items) from rulebooks.
 """
 
-from typing import List
+from typing import List, Optional
 import structlog
 from pydantic import BaseModel, Field
 
@@ -23,6 +23,14 @@ class ReferenceItem(BaseModel):
     )
     tags: List[str] = Field(
         description="Keywords or tags (e.g., 'Evocation', 'Finesse')."
+    )
+    source_page: Optional[int] = Field(
+        default=None,
+        description="The integer page number where this information was found, if available in the text context (look for '--- Page X ---').",
+    )
+    source_section: Optional[str] = Field(
+        default=None,
+        description="The title of the section or chapter this item belongs to.",
     )
 
 
@@ -54,6 +62,8 @@ class ReferenceAgent:
         - Category (be specific, e.g., 'Level 1 Spell', 'Martial Weapon')
         - Description (summarize the mechanical effect)
         - Tags (keywords)
+        - The exact Source Page number (if page markers like '--- Page X ---' are in the text)
+        - The Source Section or Chapter name
 
         Return a JSON list of objects. If no items are found, return an empty list.
         """
