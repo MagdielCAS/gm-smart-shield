@@ -16,7 +16,7 @@ services:
       - "8000:8000"
     environment:
       - ENABLE_METRICS=true
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
       # Override paths for container environment
       - SQLITE_URL=sqlite:////app/data/db/gm_shield.db
       - CHROMA_PERSIST_DIRECTORY=/app/data/chroma
@@ -27,16 +27,7 @@ services:
       - ./data/chroma:/app/data/chroma
       - ./data/uploads:/app/data/uploads
     depends_on:
-      - ollama
       - prometheus
-
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    # Note: For GPU support, add 'deploy: resources: reservations: devices: - driver: nvidia ...'
 
   prometheus:
     image: prom/prometheus
@@ -56,6 +47,5 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin  # Change in production
 
 volumes:
-  ollama_data:
   prometheus_data:
   grafana_data:

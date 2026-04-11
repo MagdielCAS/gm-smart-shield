@@ -94,6 +94,8 @@ docker-logs: ## Tail Docker logs
 docker-build: ## Build Docker images
 	@echo "Building Docker images..."
 	docker compose build
+
+run-docker: docker-build docker-up ## Build and run the project using Docker Compose
 web-lint: ## Run Web linter (Biome)
 	@echo "Running Web linter..."
 	cd apps/web && pnpm lint
